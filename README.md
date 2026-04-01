@@ -34,7 +34,7 @@ Para rodar o HairTime localmente, siga os passos abaixo:
 ### 2. Configurando o Back-end
 
     # Entre na pasta do back-end
-    cd back-end
+    cd sprint_1/back-end
 
     # Crie e ative o ambiente virtual (Windows)
     python -m venv venv
@@ -51,7 +51,7 @@ O servidor estará rodando em: `http://localhost:8000`
 ### 3. Configurando o Front-end
 
     # Em um novo terminal, entre na pasta do front-end
-    cd front-end
+    cd sprint_1/front-end
 
     # Instale as dependências do Node
     npm install
