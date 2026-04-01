@@ -5,24 +5,23 @@ import { useScheduler } from '@/composables/useScheduler'
 
 const router = useRouter()
 const {
+  selectedBarberId,
   selectedDate,
   selectedTime,
   selectedServiceId,
+  professionals,
   availableSlots,
   services,
   loading,
   error,
-  loadServices,
+  loadProfessionals,
   onDateChange,
   saveAppointment,
 } = useScheduler()
 
 onMounted(async () => {
-  await loadServices()
-  // Seleciona o primeiro serviço por padrão para facilitar
-  if (services.value.length > 0) {
-    selectedServiceId.value = services.value[0].id
-  }
+  // Agora a tela começa buscando os barbeiros, não os serviços!
+  await loadProfessionals()
 })
 
 const handleSchedule = async () => {
@@ -40,61 +39,73 @@ const handleSchedule = async () => {
       <p class="eyebrow">Novo Agendamento</p>
       <h1>Escolha seu <span class="highlight">Horário</span></h1>
 
-      <!-- MENSAGEM DE ERRO -->
       <div v-if="error" class="error-msg">{{ error }}</div>
 
       <div class="form-container">
-        <!-- 1. SERVIÇO -->
+        
         <div class="field">
-          <label>1. Qual serviço deseja?</label>
-          <select v-model="selectedServiceId" :disabled="loading">
-            <option v-for="svc in services" :key="svc.id" :value="svc.id">
-              {{ svc.name }} ({{ svc.durationMinutes }} min) - R$ {{ svc.price.toFixed(2) }}
+          <label>1. Escolha o Profissional</label>
+          <select v-model="selectedBarberId" :disabled="loading">
+            <option value="" disabled>Selecione quem vai te atender...</option>
+            <option v-for="prof in professionals" :key="prof.id" :value="prof.id">
+              {{ prof.name }}
             </option>
           </select>
         </div>
 
-        <!-- 2. DATA -->
-        <div class="field">
-          <label>2. Escolha o dia</label>
-          <input 
-            type="date" 
-            :value="selectedDate"
-            @input="e => onDateChange((e.target as HTMLInputElement).value)"
-            :min="new Date().toISOString().split('T')[0]"
-            :disabled="loading"
-          />
-        </div>
-
-        <!-- 3. HORÁRIO -->
-        <div class="field" v-if="selectedDate">
-          <label>3. Escolha o horário</label>
-          <div v-if="loading" class="loading-msg">Buscando horários disponíveis...</div>
-          
-          <div v-else-if="availableSlots.length > 0" class="time-grid">
-            <button
-              v-for="slot in availableSlots"
-              :key="slot.time"
-              :class="['time-btn', { 
-                selected: selectedTime === slot.time,
-                unavailable: !slot.available 
-              }]"
-              :disabled="!slot.available"
-              @click="selectedTime = slot.time"
-            >
-              {{ slot.time }}
-            </button>
+        <transition name="fade">
+          <div class="field" v-if="selectedBarberId">
+            <label>2. Qual serviço deseja?</label>
+            <div v-if="services.length === 0 && loading" class="loading-msg">Carregando serviços...</div>
+            <select v-else v-model="selectedServiceId" :disabled="loading">
+              <option value="" disabled>Selecione um serviço...</option>
+              <option v-for="svc in services" :key="svc.id" :value="svc.id">
+                {{ svc.name }} ({{ svc.durationMinutes }} min) - R$ {{ svc.price.toFixed(2) }}
+              </option>
+            </select>
           </div>
-          
-          <div v-else class="empty-msg">
-            Nenhum horário disponível nesta data.
-          </div>
-        </div>
+        </transition>
 
-        <!-- BOTÃO DE CONFIRMAR -->
+        <transition name="fade">
+          <div class="field" v-if="selectedServiceId">
+            <label>3. Escolha o dia</label>
+            <input 
+              type="date" 
+              :value="selectedDate"
+              @input="e => onDateChange((e.target as HTMLInputElement).value)"
+              :min="new Date().toISOString().split('T')[0]"
+              :disabled="loading"
+            />
+          </div>
+        </transition>
+
+        <transition name="fade">
+          <div class="field" v-if="selectedDate">
+            <label>4. Escolha o horário</label>
+            <div v-if="loading" class="loading-msg">Buscando horários disponíveis...</div>
+            
+            <div v-else-if="availableSlots.length > 0" class="time-grid">
+              <button
+                v-for="slot in availableSlots"
+                :key="slot.time"
+                :class="['time-btn', { 
+                  selected: selectedTime === slot.time,
+                  unavailable: !slot.available 
+                }]"
+                :disabled="!slot.available"
+                @click="selectedTime = slot.time"
+              >
+                {{ slot.time }}
+              </button>
+            </div>
+            
+            <div v-else class="empty-msg">Nenhum horário disponível nesta data.</div>
+          </div>
+        </transition>
+
         <button 
           class="submit-btn" 
-          :disabled="!selectedDate || !selectedTime || !selectedServiceId || loading"
+          :disabled="!selectedDate || !selectedTime || !selectedServiceId || !selectedBarberId || loading"
           @click="handleSchedule"
         >
           <span v-if="loading">Processando...</span>

@@ -1,62 +1,77 @@
-import { ref, computed } from 'vue'
-import type { TimeSlot, Service } from '@/types'
-// 👇 Importações atualizadas para os nomes em português
-import { disponibilidadeService, servicoService, agendamentoService } from '@/services/api'
+import { ref, computed, watch } from 'vue'
+import type { TimeSlot, Service, User } from '@/types'
+import { disponibilidadeService, servicoService, agendamentoService, profissionalService } from '@/services/api'
+import { useAuth } from '@/composables/useAuth'
 
 export function useScheduler() {
+  const selectedBarberId = ref<string>('')
   const selectedDate = ref<string>('')
   const selectedTime = ref<string | null>(null)
   const selectedServiceId = ref<string>('')
+  
+  const professionals = ref<User[]>([])
   const availableSlots = ref<TimeSlot[]>([])
   const services = ref<Service[]>([])
+  
   const loading = ref(false)
   const error = ref<string | null>(null)
-
-  // Por enquanto usa ID fixo; quando houver barber select, parametrize
-  const BARBER_ID = 'default'
 
   const selectedService = computed(() =>
     services.value.find(s => s.id === selectedServiceId.value) ?? null
   )
 
-  async function loadServices() {
+  async function loadProfessionals() {
     try {
-      // 👇 Chamada atualizada
-      const res = await servicoService.list()
-      services.value = res.data
+      const res = await profissionalService.list()
+      professionals.value = res.data
     } catch {
-      // silently fail; usa opções hardcoded como fallback
-      services.value = [
-        { id: '1', name: 'Corte', category: 'hair' as never, durationMinutes: 30, price: 35, active: true },
-        { id: '2', name: 'Escova', category: 'hair' as never, durationMinutes: 45, price: 50, active: true },
-        { id: '3', name: 'Barba', category: 'beard' as never, durationMinutes: 20, price: 25, active: true },
-      ]
+      error.value = 'Erro ao carregar profissionais'
     }
   }
+
+  watch(selectedBarberId, async (newBarberId) => {
+    selectedServiceId.value = ''
+    selectedDate.value = ''
+    selectedTime.value = null
+    services.value = []
+    availableSlots.value = []
+
+    if (newBarberId) {
+      loading.value = true
+      try {
+        const res = await servicoService.list()
+        services.value = res.data
+      } catch {
+        error.value = 'Erro ao carregar serviços'
+      } finally {
+        loading.value = false
+      }
+    }
+  })
 
   async function onDateChange(date: string) {
     selectedDate.value = date
     selectedTime.value = null
     availableSlots.value = []
 
-    if (!date) return
+    if (!date || !selectedBarberId.value) return
 
     loading.value = true
     error.value = null
     try {
-      // 👇 Chamada atualizada
-      const res = await disponibilidadeService.getSlots(BARBER_ID, date)
+      const res = await disponibilidadeService.getSlots(selectedBarberId.value, date)
       availableSlots.value = res.data
     } catch {
-      // fallback: gera horários locais enquanto API não está pronta
-      availableSlots.value = generateLocalSlots(date)
+      error.value = 'Erro ao buscar horários'
     } finally {
       loading.value = false
     }
   }
 
   async function saveAppointment(): Promise<boolean> {
-    if (!selectedDate.value || !selectedTime.value || !selectedServiceId.value) {
+    const { user } = useAuth() // Pega os dados de quem está logado
+
+    if (!selectedDate.value || !selectedTime.value || !selectedServiceId.value || !selectedBarberId.value) {
       error.value = 'Preencha todos os campos'
       return false
     }
@@ -64,57 +79,36 @@ export function useScheduler() {
     loading.value = true
     error.value = null
     try {
-      // 👇 Chamada atualizada
       await agendamentoService.create({
-        barberId: BARBER_ID,
+        barberId: selectedBarberId.value,
         serviceId: selectedServiceId.value,
+        clientId: String(user.value?.id), // Envia o ID do cliente logado
         date: selectedDate.value,
         time: selectedTime.value,
-      })
+      } as any)
       return true
-    } catch (e: unknown) {
-      error.value = (e as { message: string }).message ?? 'Erro ao agendar'
+    } catch (e: any) {
+      error.value = e.message ?? 'Erro ao agendar'
       return false
     } finally {
       loading.value = false
     }
   }
 
+  // 👇 O SEGREDO ESTAVA AQUI: Faltou devolver as variáveis pro Vue no final!
   return {
+    selectedBarberId,
     selectedDate,
     selectedTime,
     selectedServiceId,
+    professionals,
     availableSlots,
     services,
     selectedService,
     loading,
     error,
-    loadServices,
+    loadProfessionals,
     onDateChange,
     saveAppointment,
   }
-}
-
-// ─── FALLBACK LOCAL (enquanto API não está pronta) ───────────────────────────
-
-function generateLocalSlots(dateStr: string): TimeSlot[] {
-  const date = new Date(dateStr + 'T12:00:00')
-  const day = date.getDay()
-
-  if (day === 0) return []
-
-  const busyTimes = new Set(['10:00', '14:30'])
-  const slots: TimeSlot[] = []
-
-  const start = day === 1 ? 10 : 9
-  const end = day === 1 ? 13 : 18
-
-  for (let h = start; h < end; h++) {
-    for (const min of ['00', '30']) {
-      const time = `${String(h).padStart(2, '0')}:${min}`
-      slots.push({ time, available: !busyTimes.has(time) })
-    }
-  }
-
-  return slots
 }

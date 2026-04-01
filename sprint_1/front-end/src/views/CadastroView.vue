@@ -7,14 +7,34 @@ import { UserType } from '@/types'
 const router = useRouter()
 const { login, register, loading, error } = useAuth()
 const mode = ref<'login' | 'register'>('login')
-const form = reactive({ name: '', email: '', password: '', confirmPassword: '', type: UserType.CLIENT })
+
+// 👇 O campo adminPassword foi adicionado aqui no form
+const form = reactive({ 
+  name: '', 
+  email: '', 
+  password: '', 
+  confirmPassword: '', 
+  type: UserType.CLIENT,
+  adminPassword: ''
+})
+
 const localError = ref<string | null>(null)
 
 async function handleSubmit() {
   localError.value = null
   if (mode.value === 'register') {
-    if (form.password !== form.confirmPassword) { localError.value = 'As senhas não coincidem'; return }
-    await register({ name: form.name, email: form.email, password: form.password, type: form.type })
+    if (form.password !== form.confirmPassword) { 
+      localError.value = 'As senhas não coincidem'
+      return 
+    }
+    // 👇 O adminPassword está sendo enviado no payload
+    await register({ 
+      name: form.name, 
+      email: form.email, 
+      password: form.password, 
+      type: form.type,
+      adminPassword: form.adminPassword 
+    } as any)
   } else {
     await login({ email: form.email, password: form.password })
   }
@@ -36,18 +56,22 @@ async function handleSubmit() {
         <button :class="{ active: mode === 'register' }" @click="mode = 'register'">Criar conta</button>
       </div>
       <form @submit.prevent="handleSubmit" class="auth-form">
+        
         <div v-if="mode === 'register'" class="field">
           <label>Nome completo</label>
           <input v-model="form.name" type="text" placeholder="Seu nome" required />
         </div>
+        
         <div class="field">
           <label>Email</label>
           <input v-model="form.email" type="email" placeholder="seu@email.com" required />
         </div>
+        
         <div class="field">
           <label>Senha</label>
           <input v-model="form.password" type="password" placeholder="••••••••" required />
         </div>
+        
         <template v-if="mode === 'register'">
           <div class="field">
             <label>Confirmar senha</label>
@@ -60,8 +84,21 @@ async function handleSubmit() {
               <option :value="UserType.BARBER">Cabeleireiro / Barbeiro</option>
             </select>
           </div>
+
+          <div v-if="form.type === UserType.BARBER" class="field admin-auth">
+            <label>Chave de Autorização (Admin)</label>
+            <input 
+              v-model="form.adminPassword" 
+              type="password" 
+              placeholder="Senha master da barbearia" 
+              required 
+            />
+            <p class="help-text">Apenas funcionários autorizados.</p>
+          </div>
         </template>
+        
         <p v-if="localError || error" class="field-error">{{ localError || error }}</p>
+        
         <button type="submit" class="submit-btn" :disabled="loading">
           <span v-if="loading">Aguarde…</span>
           <span v-else>{{ mode === 'login' ? 'Entrar' : 'Criar conta' }}</span>
@@ -72,6 +109,7 @@ async function handleSubmit() {
 </template>
 
 <style scoped>
+/* Seu CSS original, mais os ajustes para a senha do admin */
 .auth-page { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; position:relative; }
 .auth-glow { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:500px; height:500px; border-radius:50%; background:radial-gradient(circle,rgba(212,175,55,0.07) 0%,transparent 70%); pointer-events:none; }
 .auth-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09); border-radius:24px; padding:48px 44px; width:100%; max-width:440px; backdrop-filter:blur(20px); position:relative; z-index:1; }
@@ -91,4 +129,8 @@ async function handleSubmit() {
 .submit-btn { margin-top:8px; padding:15px; border-radius:13px; border:none; font-size:16px; font-weight:700; font-family:inherit; background:linear-gradient(135deg,#d4af37,#f1c40f); color:#000; cursor:pointer; transition:0.25s; }
 .submit-btn:hover:not(:disabled) { transform:scale(1.03); box-shadow:0 0 24px rgba(212,175,55,0.4); }
 .submit-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* 👇 Estilos novos para o campo de admin */
+.admin-auth { border-left: 3px solid #d4af37; padding-left: 12px; margin-top: 5px; }
+.help-text { font-size: 11px; color: #e74c3c; margin-top: -3px; }
 </style>

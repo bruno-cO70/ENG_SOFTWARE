@@ -63,7 +63,8 @@ export const authService = {
     })
   },
 
-  register(payload: RegisterPayload): Promise<ApiResponse<AuthResponse>> {
+  // 👇 Truque de TypeScript: Adicionamos o adminPassword direto aqui
+  register(payload: RegisterPayload & { adminPassword?: string }): Promise<ApiResponse<AuthResponse>> {
     return request('/auth/cadastro', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -130,6 +131,13 @@ export const servicoService = {
   get(id: string): Promise<ApiResponse<Service>> {
     return request(`/servicos/${id}`)
   },
+
+  create(payload: { name: string; price: number; durationMinutes: number }): Promise<ApiResponse<Service>> {
+    return request('/servicos', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
 }
 
 // ─────────────────────────────────────────────
@@ -138,7 +146,6 @@ export const servicoService = {
 
 export const disponibilidadeService = {
   getSlots(profissionalId: string, data: string): Promise<ApiResponse<TimeSlot[]>> {
-    // Usando profissional_id e data para bater com o Back-end
     return request(`/disponibilidade?profissional_id=${profissionalId}&data=${data}`)
   },
 }
