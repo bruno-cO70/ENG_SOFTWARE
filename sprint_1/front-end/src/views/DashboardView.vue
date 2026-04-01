@@ -2,7 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-import { appointmentService } from '@/services/api'
+// 👇 Importação atualizada para agendamentoService
+import { agendamentoService } from '@/services/api'
 import type { Appointment } from '@/types'
 import { AppointmentStatus } from '@/types'
 
@@ -18,7 +19,8 @@ onMounted(async () => {
     return
   }
   try {
-    const res = await appointmentService.list()
+    // 👇 Chamada atualizada
+    const res = await agendamentoService.list()
     appointments.value = res.data
   } catch {
     // API ainda não disponível — mostra estado vazio

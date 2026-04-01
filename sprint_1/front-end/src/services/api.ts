@@ -52,7 +52,7 @@ async function request<T>(
 }
 
 // ─────────────────────────────────────────────
-//  AUTH
+//  AUTENTICAÇÃO (AUTH)
 // ─────────────────────────────────────────────
 
 export const authService = {
@@ -64,94 +64,95 @@ export const authService = {
   },
 
   register(payload: RegisterPayload): Promise<ApiResponse<AuthResponse>> {
-    return request('/auth/register', {
+    return request('/auth/cadastro', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
   },
 
   me(): Promise<ApiResponse<User>> {
-    return request('/auth/me')
+    return request('/auth/eu')
   },
 
   logout(): Promise<void> {
-    return request('/auth/logout', { method: 'POST' })
+    return request('/auth/sair', { method: 'POST' })
   },
 }
 
 // ─────────────────────────────────────────────
-//  APPOINTMENTS
+//  AGENDAMENTOS
 // ─────────────────────────────────────────────
 
-export const appointmentService = {
+export const agendamentoService = {
   list(params?: {
     page?: number
     status?: string
-    barberId?: string
+    profissionalId?: string
   }): Promise<PaginatedResponse<Appointment>> {
     const query = new URLSearchParams(
       Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
     )
-    return request(`/appointments?${query}`)
+    return request(`/agendamentos?${query}`)
   },
 
   get(id: string): Promise<ApiResponse<Appointment>> {
-    return request(`/appointments/${id}`)
+    return request(`/agendamentos/${id}`)
   },
 
   create(payload: CreateAppointmentPayload): Promise<ApiResponse<Appointment>> {
-    return request('/appointments', {
+    return request('/agendamentos', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
   },
 
   update(id: string, payload: UpdateAppointmentPayload): Promise<ApiResponse<Appointment>> {
-    return request(`/appointments/${id}`, {
+    return request(`/agendamentos/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     })
   },
 
   cancel(id: string): Promise<ApiResponse<Appointment>> {
-    return request(`/appointments/${id}/cancel`, { method: 'PATCH' })
+    return request(`/agendamentos/${id}/cancelar`, { method: 'PATCH' })
   },
 }
 
 // ─────────────────────────────────────────────
-//  SERVICES
+//  SERVIÇOS (Corte, Barba, etc)
 // ─────────────────────────────────────────────
 
-export const serviceService = {
+export const servicoService = {
   list(): Promise<ApiResponse<Service[]>> {
-    return request('/services')
+    return request('/servicos')
   },
 
   get(id: string): Promise<ApiResponse<Service>> {
-    return request(`/services/${id}`)
+    return request(`/servicos/${id}`)
   },
 }
 
 // ─────────────────────────────────────────────
-//  AVAILABILITY
+//  DISPONIBILIDADE
 // ─────────────────────────────────────────────
 
-export const availabilityService = {
-  getSlots(barberId: string, date: string): Promise<ApiResponse<TimeSlot[]>> {
-    return request(`/availability?barberId=${barberId}&date=${date}`)
+export const disponibilidadeService = {
+  getSlots(profissionalId: string, data: string): Promise<ApiResponse<TimeSlot[]>> {
+    // Usando profissional_id e data para bater com o Back-end
+    return request(`/disponibilidade?profissional_id=${profissionalId}&data=${data}`)
   },
 }
 
 // ─────────────────────────────────────────────
-//  BARBERS
+//  PROFISSIONAIS (BARBEIROS/CABELEIREIROS)
 // ─────────────────────────────────────────────
 
-export const barberService = {
+export const profissionalService = {
   list(): Promise<ApiResponse<User[]>> {
-    return request('/barbers')
+    return request('/profissionais')
   },
 
   get(id: string): Promise<ApiResponse<User>> {
-    return request(`/barbers/${id}`)
+    return request(`/profissionais/${id}`)
   },
 }

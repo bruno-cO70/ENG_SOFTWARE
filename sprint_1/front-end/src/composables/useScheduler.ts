@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import type { TimeSlot, Service } from '@/types'
-import { availabilityService, serviceService, appointmentService } from '@/services/api'
+// 👇 Importações atualizadas para os nomes em português
+import { disponibilidadeService, servicoService, agendamentoService } from '@/services/api'
 
 export function useScheduler() {
   const selectedDate = ref<string>('')
@@ -20,7 +21,8 @@ export function useScheduler() {
 
   async function loadServices() {
     try {
-      const res = await serviceService.list()
+      // 👇 Chamada atualizada
+      const res = await servicoService.list()
       services.value = res.data
     } catch {
       // silently fail; usa opções hardcoded como fallback
@@ -42,7 +44,8 @@ export function useScheduler() {
     loading.value = true
     error.value = null
     try {
-      const res = await availabilityService.getSlots(BARBER_ID, date)
+      // 👇 Chamada atualizada
+      const res = await disponibilidadeService.getSlots(BARBER_ID, date)
       availableSlots.value = res.data
     } catch {
       // fallback: gera horários locais enquanto API não está pronta
@@ -61,7 +64,8 @@ export function useScheduler() {
     loading.value = true
     error.value = null
     try {
-      await appointmentService.create({
+      // 👇 Chamada atualizada
+      await agendamentoService.create({
         barberId: BARBER_ID,
         serviceId: selectedServiceId.value,
         date: selectedDate.value,
