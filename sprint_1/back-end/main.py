@@ -4,12 +4,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import jwt
 from datetime import datetime, timedelta
+from passlib.context import CryptContext # <-- IMPORTAÇÃO DA CRIPTOGRAFIA
 import models
 import database
 
 
 SECRET_KEY = "chave_super_secreta_do_hairtime"
 ALGORITHM = "HS256"
+
+# ---------------------------------------------------------
+# CONFIGURAÇÃO DE CRIPTOGRAFIA (Bcrypt)
+# ---------------------------------------------------------
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI()
@@ -33,7 +45,7 @@ class ServicoCreate(BaseModel):
 class AgendamentoCreate(BaseModel):
     barberId: str
     serviceId: str
-    clientId: str # <-- Agora o Front-end avisa quem é o cliente!
+    clientId: str 
     date: str
     time: str
 
@@ -49,7 +61,7 @@ class LoginSchema(BaseModel):
     password: str
 
 # ---------------------------------------------------------
-# ROTAS
+# ROTAS DE SERVIÇOS E AGENDAMENTOS
 # ---------------------------------------------------------
 @app.post("/api/servicos")
 def criar_servico(servico: ServicoCreate, db: Session = Depends(database.get_db)):
@@ -78,7 +90,6 @@ def get_disponibilidade(profissional_id: str, data: str, db: Session = Depends(d
 
 @app.post("/api/agendamentos")
 def create_agendamento(appt: AgendamentoCreate, db: Session = Depends(database.get_db)):
-    # 👇 Agora salvamos as 3 pontas da história
     novo_agendamento = models.Agendamento(
         profissional_id=int(appt.barberId),
         cliente_id=int(appt.clientId),
@@ -95,7 +106,6 @@ def listar_agendamentos(db: Session = Depends(database.get_db)):
     agendamentos = db.query(models.Agendamento).all()
     lista_formatada = []
     for a in agendamentos:
-        # 👇 Puxamos os nomes dinamicamente!
         lista_formatada.append({
             "id": str(a.id),
             "date": a.data,
@@ -109,6 +119,9 @@ def listar_agendamentos(db: Session = Depends(database.get_db)):
         })
     return {"data": lista_formatada}
 
+# ---------------------------------------------------------
+# ROTAS DE AUTENTICAÇÃO (AGORA COM CRIPTOGRAFIA 🔒)
+# ---------------------------------------------------------
 @app.post("/api/auth/cadastro")
 def cadastrar(usuario: CadastroSchema, db: Session = Depends(database.get_db)):
     if usuario.type == 'barber' and usuario.adminPassword != "admin123":
@@ -116,20 +129,36 @@ def cadastrar(usuario: CadastroSchema, db: Session = Depends(database.get_db)):
     if db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first():
         raise HTTPException(status_code=400, detail="Este e-mail já está em uso.")
 
-    novo_usuario = models.Usuario(nome=usuario.name, email=usuario.email, senha=usuario.password, tipo=usuario.type)
+    #Aplica o Hash na senha antes de salvar no banco!
+    novo_usuario = models.Usuario(
+        nome=usuario.name, 
+        email=usuario.email, 
+        senha=get_password_hash(usuario.password), 
+        tipo=usuario.type
+    )
+    
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
+    
     token = jwt.encode({"sub": novo_usuario.email, "exp": datetime.utcnow() + timedelta(days=1)}, SECRET_KEY, algorithm=ALGORITHM)
     return {"data": {"user": {"id": str(novo_usuario.id), "name": novo_usuario.nome, "email": novo_usuario.email, "type": novo_usuario.tipo}, "token": token}}
 
 @app.post("/api/auth/login")
 def login(credenciais: LoginSchema, db: Session = Depends(database.get_db)):
-    user = db.query(models.Usuario).filter(models.Usuario.email.ilike(credenciais.email), models.Usuario.senha == credenciais.password).first()
-    if not user: raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+    #Busca apenas pelo email primeiro
+    user = db.query(models.Usuario).filter(models.Usuario.email.ilike(credenciais.email)).first()
+    
+    #Depois verifica se o usuário existe e se a senha descriptografada bate
+    if not user or not verify_password(credenciais.password, user.senha): 
+        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+        
     token = jwt.encode({"sub": user.email, "exp": datetime.utcnow() + timedelta(days=1)}, SECRET_KEY, algorithm=ALGORITHM)
     return {"data": {"user": {"id": str(user.id), "name": user.nome, "email": user.email, "type": user.tipo}, "token": token}}
 
+# ---------------------------------------------------------
+# OUTRAS ROTAS
+# ---------------------------------------------------------
 @app.get("/api/profissionais")
 def listar_profissionais(db: Session = Depends(database.get_db)):
     barbeiros = db.query(models.Usuario).filter(models.Usuario.tipo == 'barber').all()
@@ -137,5 +166,6 @@ def listar_profissionais(db: Session = Depends(database.get_db)):
 
 @app.get("/api/auth/eu")
 def verificar_sessao(): return {"status": "ok"}
+
 @app.post("/api/auth/sair")
 def deslogar(): return {"message": "Sessão encerrada"}
