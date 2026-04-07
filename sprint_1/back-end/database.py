@@ -2,19 +2,28 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 import os
 
 load_dotenv()
 
-DATABASE_URL = (
+DB_PASSWORD = quote_plus(os.getenv('DB_PASSWORD')) #Função para converter caracteres em um formato seguro, Adicionado por conta de não conseguir ler o @ da senha
 
-    f"postgresql://{os.getenv('DB_user')}:"  #Busca user .env 
-    f"{os.getenv('DB_password')}@" #Busca senha .env
-    f"{os.getenv('DB_host')}:" #Busca endereço .env
-    f"{os.getenv('DB_port')}/" #Busca porta conexão .env
-    f"{os.getenv('DB_name')}" #Busca nome no .env
+DATABASE_URL = (
+    f"postgresql://{os.getenv('DB_USER')}:"  #Busca user .env 
+    f"{DB_PASSWORD}@" 
+    f"{os.getenv('DB_HOST')}:" #Busca endereço .env
+    f"{os.getenv('DB_PORT')}/" #Busca porta conexão .env
+    f"{os.getenv('DB_NAME')}" #Busca nome no .env
     )
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import models
 import database
 
+
 SECRET_KEY = "chave_super_secreta_do_hairtime"
 ALGORITHM = "HS256"
 
