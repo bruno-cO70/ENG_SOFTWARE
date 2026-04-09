@@ -43,3 +43,5 @@ O sistema opera em uma infraestrutura distribuída em nuvem para garantir alta d
 
 ---
 Desenvolvido por **Bruno**, **Livia** e **Miguel**.
+
+integração com jira
