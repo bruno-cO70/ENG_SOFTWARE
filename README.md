@@ -45,3 +45,17 @@ O sistema opera em uma infraestrutura distribuída em nuvem para garantir alta d
 Desenvolvido por **Bruno**, **Livia** e **Miguel**.
 
 integração com jira
+
+## 🎯 Relacionado à Tarefa
+Fixes #SCRUM-5
+
+## 🚀 O que foi feito nesta Sprint?
+- Implementação da rota de cadastro de usuários no FastAPI.
+- Integração do Front-end (Vue 3 + Composition API) com o endpoint de registro.
+- Configuração de Hash de senha (Bcrypt) para segurança dos dados sensíveis.
+- CI/CD e Deploy realizados com sucesso no Render e Vercel.
+
+## ✅ Definição de Pronto (DoD) atendida:
+- [x] Usuário consegue se cadastrar na plataforma.
+- [x] Dados persistidos com segurança no PostgreSQL (Supabase).
+- [x] Documentação interativa (Swagger) atualizada e testável.
