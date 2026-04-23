@@ -13,6 +13,9 @@ const appointments = ref<Appointment[]>([])
 const services = ref<Service[]>([])
 const loading = ref(true)
 
+// Controle de carregamento específico para o botão de cancelar
+const isCanceling = ref<string | null>(null)
+
 // Controle do formulário de serviços
 const showServiceForm = ref(false)
 const isCreatingService = ref(false)
@@ -34,19 +37,55 @@ async function loadDashboardData() {
       servicoService.list()
     ])
     
-    // 👇 FILTRA OS AGENDAMENTOS: Mostra só os do usuário logado!
     const todosAgendamentos = apptRes.data as any[]
-    if (user.value?.type === 'barber') {
-      appointments.value = todosAgendamentos.filter(a => a.barberId === String(user.value?.id))
-    } else {
-      appointments.value = todosAgendamentos.filter(a => a.clientId === String(user.value?.id))
-    }
+    const now = new Date(); // Pega a data e hora exata de "agora"
+    
+    // 👇 NOVO FILTRO SUPER INTELIGENTE
+    appointments.value = todosAgendamentos.filter(a => {
+      // 1. É do usuário logado?
+      const isOwner = user.value?.type === 'barber' 
+        ? a.barberId === String(user.value?.id) 
+        : a.clientId === String(user.value?.id);
+        
+      // 2. Não está cancelado?
+      const isNotCancelled = a.status !== AppointmentStatus.CANCELLED;
+      
+      // 3. Regra dos 30 minutos: O agendamento já expirou?
+      // Transforma a data do banco (2026-04-23) e hora (16:00) em um formato de tempo real
+      const dataAgendamento = new Date(`${a.date}T${a.time}:00`); 
+      // Adiciona 30 minutos (30 * 60.000 milissegundos) à hora do agendamento
+      const limiteExpiracao = new Date(dataAgendamento.getTime() + (30 * 60000));
+      
+      // O agendamento só aparece se o tempo de "agora" for menor que o "limite de expiração"
+      const isNotExpired = now < limiteExpiracao;
+
+      return isOwner && isNotCancelled && isNotExpired;
+    })
 
     services.value = servRes.data
   } catch (error) {
     console.error("Erro ao buscar dados", error)
   } finally {
     loading.value = false
+  }
+}
+
+// 👇 NOVA FUNÇÃO: Conecta o botão à API de Cancelamento
+async function handleCancelAppointment(id: string) {
+  // Pede confirmação antes de cancelar
+  if (!window.confirm("Tem certeza que deseja cancelar este agendamento? O horário será liberado.")) return;
+
+  isCanceling.value = id; // Ativa o loading só no botão clicado
+  
+  try {
+    await agendamentoService.cancel(id);
+    // Recarrega os dados para atualizar a lista E os "cards" de estatísticas lá no topo
+    await loadDashboardData(); 
+  } catch (error) {
+    alert("Erro ao cancelar o agendamento. Tente novamente.");
+    console.error(error);
+  } finally {
+    isCanceling.value = null;
   }
 }
 
@@ -62,7 +101,7 @@ async function handleAddService() {
     showServiceForm.value = false
     newService.name = ''
     newService.price = 0
-    await loadDashboardData() // Recarrega a lista
+    await loadDashboardData()
   } catch (error) {
     alert("Erro ao criar serviço")
   } finally {
@@ -161,9 +200,22 @@ function handleLogout() {
             <p v-if="user?.type === 'barber'" class="appt-client">👤 Cliente: {{ (appt as any).clientName }}</p>
             <p v-else class="appt-client">✂️ Profissional: {{ (appt as any).barberName }}</p>
           </div>
-          <span class="appt-status" :class="appt.status">
-            {{ statusLabel[appt.status] }}
-          </span>
+          
+          <div class="appt-actions">
+            <span class="appt-status" :class="appt.status">
+              {{ statusLabel[appt.status] }}
+            </span>
+            
+            <button 
+              v-if="appt.status !== AppointmentStatus.CANCELLED && appt.status !== AppointmentStatus.COMPLETED"
+              class="btn-cancel"
+              :disabled="isCanceling === appt.id"
+              @click="handleCancelAppointment(appt.id)"
+            >
+              {{ isCanceling === appt.id ? 'Cancelando...' : 'Cancelar' }}
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
@@ -172,7 +224,6 @@ function handleLogout() {
 </template>
 
 <style scoped>
-/* COPIE TODO O CSS QUE JÁ ESTAVA AQUI ANTES E ADICIONE ESTE FINAL */
 .dashboard-page { max-width: 900px; margin: 0 auto; padding: 60px 40px; min-height: 100vh; }
 .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px; gap: 20px; flex-wrap: wrap; }
 .eyebrow { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: #d4af37; margin-bottom: 8px; }
@@ -195,10 +246,10 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
 .stat-value { font-size: 40px; font-weight: 700; color: #f1c40f; }
 .stat-label { color: #666; font-size: 13px; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
-/* SERVIÇOS (NOVOS ESTILOS) */
+/* SERVIÇOS */
 .services-section { margin-bottom: 48px; }
 .section-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.services-section h2, .appointments-section h2 { font-size: 20px; font-weight: 600; color: #ccc; }
+.services-section h2, .appointments-section h2 { font-size: 20px; font-weight: 600; color: #ccc;margin-bottom: 24px; }
 .service-form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; background: rgba(255,255,255,0.02); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px; }
 .service-form input { padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white; font-family: inherit; }
 .service-form input:focus { outline: none; border-color: #d4af37; }
@@ -208,19 +259,87 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
 .svc-details { font-size: 13px; color: #aaa; }
 .empty-msg { color: #666; font-size: 14px; font-style: italic; }
 
-/* LISTA */
+/* LISTA & AÇÕES NO CARD */
 .appointment-list { display: flex; flex-direction: column; gap: 12px; }
 .appt-card { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 20px 24px; transition: 0.2s; }
 .appt-card:hover { border-color: rgba(212,175,55,0.2); }
 .appt-date { font-size: 13px; color: #777; margin-bottom: 4px; }
 .appt-service { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
 .appt-client { font-size: 13px; color: #d4af37; }
-.appt-status { font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
-.appt-status.confirmed { background: rgba(39,174,96,0.15); color: #2ecc71; }
-.appt-status.pending { background: rgba(241,196,15,0.1); color: #f1c40f; }
-.appt-status.cancelled { background: rgba(231,76,60,0.1); color: #e74c3c; }
-.empty-state { text-align: center; padding: 80px 20px; color: #555; }
-.empty-state p:first-child { font-size: 48px; margin-bottom: 12px; }
-.empty-state p { font-size: 16px; margin-bottom: 28px; }
-.state-msg { color: #555; padding: 40px 0; }
+
+/* NOVOS ESTILOS PARA O BOTÃO DE CANCELAR */
+.appt-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.btn-cancel { 
+  background: transparent; 
+  border: 1px solid rgba(231,76,60,0.4); 
+  color: #e74c3c; 
+  padding: 6px 0; 
+  border-radius: 6px; 
+  font-size: 11px; 
+  font-weight: 600; 
+  cursor: pointer; 
+  text-transform: uppercase; 
+  transition: 0.2s; 
+  width: 120px; 
+  text-align: center; 
+  box-sizing: border-box;
+}
+
+.btn-cancel:hover:not(:disabled) { 
+  background: rgba(231,76,60,0.1); 
+  border-color: #e74c3c; 
+}
+.btn-cancel:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+}
+
+.appt-status { 
+  font-size: 11px; 
+  font-weight: 700; 
+  padding: 6px 0; 
+  border-radius: 6px; 
+  letter-spacing: 0.5px; 
+  text-transform: uppercase; 
+  text-align: center; 
+  display: inline-block;
+  width: 120px; 
+  box-sizing: border-box;
+}
+
+/* 👇 As novas classes em português */
+.appt-status.confirmado { 
+  background: rgba(39,174,96,0.1); 
+  color: #2ecc71; 
+  border: 1px solid rgba(39,174,96,0.3); /* Cara de botão */
+}
+.appt-status.pendente { 
+  background: rgba(241,196,15,0.1); 
+  color: #f1c40f; 
+  border: 1px solid rgba(241,196,15,0.3);
+}
+.appt-status.Cancelado { 
+  background: rgba(231,76,60,0.1); 
+  color: #e74c3c; 
+}
+.empty-state { 
+  text-align: center; 
+  padding: 80px 20px; 
+  color: #888; 
+  background: rgba(255, 255, 255, 0.02); /* Fundo de card sutil */
+  border: 1px dashed rgba(255, 255, 255, 0.15); /* Borda tracejada (estilo "vazio") */
+  border-radius: 16px; 
+  margin-top: 10px;
+}
+
+.empty-state p:first-child { 
+  font-size: 54px; /* Emote grandão */
+  margin-bottom: 16px; 
+}
+
+.empty-state p:last-child { 
+  font-size: 16px; 
+  font-weight: 500;
+  color: #aaa;
+}
 </style>

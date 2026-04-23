@@ -9,9 +9,9 @@ export enum UserType {
 }
 
 export enum AppointmentStatus {
-  PENDING = 'pending',
-  CONFIRMED = 'confirmed',
-  CANCELLED = 'cancelled',
+  PENDING = 'pendente',
+  CONFIRMED = 'confirmado',
+  CANCELLED = 'Cancelado',
   COMPLETED = 'completed',
 }
 
