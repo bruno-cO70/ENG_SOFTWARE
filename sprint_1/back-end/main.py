@@ -77,15 +77,39 @@ def listar_servicos(db: Session = Depends(database.get_db)):
     lista = [{"id": str(s.id), "name": s.nome, "durationMinutes": s.duracao, "price": s.preco} for s in servicos]
     return {"data": lista}
 
+from datetime import datetime # 👈 Certifique-se de que isso está importado lá no topo!
+
 @app.get("/api/disponibilidade")
 def get_disponibilidade(profissional_id: str, data: str, db: Session = Depends(database.get_db)):
     todos_horarios = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
+    
+    # Busca os ocupados
     ocupados = db.query(models.Agendamento).filter(
         models.Agendamento.profissional_id == int(profissional_id),
-        models.Agendamento.data == data
+        models.Agendamento.data == data,
+        models.Agendamento.status != "Cancelado" 
     ).all()
+    
     horarios_ocupados = [a.horario for a in ocupados]
-    slots = [{"time": h, "available": h not in horarios_ocupados} for h in todos_horarios]
+    
+    # 👇 NOVA LÓGICA DE TEMPO REAL
+    agora = datetime.now()
+    data_hoje_str = agora.strftime("%Y-%m-%d") # ex: "2024-04-10"
+    hora_atual_str = agora.strftime("%H:%M")   # ex: "15:30"
+    
+    slots = []
+    for h in todos_horarios:
+        # Por padrão, está disponível se não estiver ocupado no banco
+        is_available = h not in horarios_ocupados
+        
+        # A MÁGICA: Se o cliente estiver olhando a agenda DE HOJE...
+        if data == data_hoje_str:
+            # ...e a hora do botão for MENOR que a hora do relógio dele agora
+            if h <= hora_atual_str:
+                is_available = False # Bloqueia!
+                
+        slots.append({"time": h, "available": is_available})
+        
     return {"data": slots}
 
 @app.post("/api/agendamentos")
@@ -95,11 +119,12 @@ def create_agendamento(appt: AgendamentoCreate, db: Session = Depends(database.g
         cliente_id=int(appt.clientId),
         servico_id=int(appt.serviceId),
         data=appt.date,
-        horario=appt.time
+        horario=appt.time,
+        status="confirmado" 
     )
     db.add(novo_agendamento)
     db.commit()
-    return {"data": {"id": "sucesso", "status": "confirmed"}}
+    return {"data": {"id": "sucesso", "status": "confirmado"}}
 
 @app.get("/api/agendamentos")
 def listar_agendamentos(db: Session = Depends(database.get_db)):
@@ -110,7 +135,7 @@ def listar_agendamentos(db: Session = Depends(database.get_db)):
             "id": str(a.id),
             "date": a.data,
             "time": a.horario,
-            "status": "confirmed",
+            "status": a.status,
             "clientId": str(a.cliente_id),
             "clientName": a.cliente.nome if a.cliente else "Cliente Removido",
             "barberId": str(a.profissional_id),
@@ -118,6 +143,28 @@ def listar_agendamentos(db: Session = Depends(database.get_db)):
             "service": {"name": a.servico.nome if a.servico else "Serviço Removido"} 
         })
     return {"data": lista_formatada}
+
+@app.patch("/api/agendamentos/{agendamento_id}/cancelar")
+def cancelar_agendamento(agendamento_id: int, db: Session = Depends(database.get_db)):
+    # 1. Busca o agendamento no banco pelo ID
+    agendamento = db.query(models.Agendamento).filter(models.Agendamento.id == agendamento_id).first()
+    
+    # 2. Valida se o agendamento existe
+    if not agendamento:
+        raise HTTPException(status_code=404, detail="Agendamento não encontrado")
+    
+    # 3. Valida se já não está cancelado (opcional, mas boa prática)
+    if agendamento.status == "Cancelado":
+        raise HTTPException(status_code=400, detail="Este agendamento já foi cancelado")
+
+    # 4. Altera o status para "Cancelado"
+    agendamento.status = "Cancelado"
+    
+    # 5. Salva a alteração no banco de dados
+    db.commit()
+    db.refresh(agendamento)
+    
+    return {"message": "Agendamento cancelado com sucesso", "status_atual": agendamento.status}
 
 # ---------------------------------------------------------
 # ROTAS DE AUTENTICAÇÃO (AGORA COM CRIPTOGRAFIA 🔒)
