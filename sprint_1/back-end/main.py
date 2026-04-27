@@ -49,6 +49,10 @@ class AgendamentoCreate(BaseModel):
     date: str
     time: str
 
+class AgendamentoUpdate(BaseModel):
+    date: str
+    time: str
+
 class CadastroSchema(BaseModel):
     name: str
     email: str
@@ -165,6 +169,50 @@ def cancelar_agendamento(agendamento_id: int, db: Session = Depends(database.get
     db.refresh(agendamento)
     
     return {"message": "Agendamento cancelado com sucesso", "status_atual": agendamento.status}
+
+@app.put("/api/agendamentos/{agendamento_id}")
+def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, db: Session = Depends(database.get_db)):
+    # 1. Busca o agendamento original
+    agendamento = db.query(models.Agendamento).filter(models.Agendamento.id == agendamento_id).first()
+    
+    if not agendamento:
+        raise HTTPException(status_code=404, detail="Agendamento não encontrado")
+
+    if agendamento.status == "Cancelado":
+        raise HTTPException(status_code=400, detail="Não é possível remarcar um agendamento cancelado")
+
+    # 2. Valida se o novo horário não está no passado (Máquina do tempo bloqueada!)
+    agora = datetime.now()
+    data_hoje_str = agora.strftime("%Y-%m-%d")
+    hora_atual_str = agora.strftime("%H:%M")
+
+    if novos_dados.date < data_hoje_str or (novos_dados.date == data_hoje_str and novos_dados.time <= hora_atual_str):
+        raise HTTPException(status_code=400, detail="Não é possível remarcar para um horário no passado")
+
+    # 3. Valida se o novo horário já está ocupado por OUTRO agendamento
+    conflito = db.query(models.Agendamento).filter(
+        models.Agendamento.profissional_id == agendamento.profissional_id,
+        models.Agendamento.data == novos_dados.date,
+        models.Agendamento.horario == novos_dados.time,
+        models.Agendamento.status != "Cancelado",
+        models.Agendamento.id != agendamento_id # Ignora ele mesmo na busca
+    ).first()
+
+    if conflito:
+        raise HTTPException(status_code=400, detail="Este horário já está ocupado por outro cliente")
+
+    # 4. Aplica os novos dados e salva
+    agendamento.data = novos_dados.date
+    agendamento.horario = novos_dados.time
+    
+    db.commit()
+    db.refresh(agendamento)
+
+    return {
+        "message": "Agendamento remarcado com sucesso!", 
+        "data": agendamento.data, 
+        "time": agendamento.horario
+    }
 
 # ---------------------------------------------------------
 # ROTAS DE AUTENTICAÇÃO (AGORA COM CRIPTOGRAFIA 🔒)

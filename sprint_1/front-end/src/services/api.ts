@@ -117,6 +117,13 @@ export const agendamentoService = {
   cancel(id: string): Promise<ApiResponse<Appointment>> {
     return request(`/agendamentos/${id}/cancelar`, { method: 'PATCH' })
   },
+
+  reschedule(id: string, payload: { date: string; time: string }): Promise<ApiResponse<any>> {
+    return request(`/agendamentos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  },
 }
 
 // ─────────────────────────────────────────────

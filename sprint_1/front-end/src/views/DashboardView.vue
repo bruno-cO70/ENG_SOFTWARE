@@ -2,8 +2,8 @@
 import { onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-import { agendamentoService, servicoService } from '@/services/api'
-import type { Appointment, Service } from '@/types'
+import { agendamentoService, servicoService, disponibilidadeService } from '@/services/api'
+import type { Appointment, Service, TimeSlot } from '@/types'
 import { AppointmentStatus } from '@/types'
 
 const router = useRouter()
@@ -13,13 +13,17 @@ const appointments = ref<Appointment[]>([])
 const services = ref<Service[]>([])
 const loading = ref(true)
 
-// Controle de carregamento específico para o botão de cancelar
 const isCanceling = ref<string | null>(null)
-
-// Controle do formulário de serviços
 const showServiceForm = ref(false)
 const isCreatingService = ref(false)
 const newService = reactive({ name: '', price: 0, durationMinutes: 30 })
+
+// 👇 NOVAS VARIÁVEIS PARA O MODAL DE REMARCAR
+const rescheduleAppt = ref<Appointment | null>(null)
+const rescheduleDate = ref('')
+const rescheduleTime = ref('')
+const rescheduleSlots = ref<TimeSlot[]>([])
+const isRescheduling = ref(false)
 
 onMounted(async () => {
   if (!isAuthenticated.value) {
@@ -38,25 +42,16 @@ async function loadDashboardData() {
     ])
     
     const todosAgendamentos = apptRes.data as any[]
-    const now = new Date(); // Pega a data e hora exata de "agora"
+    const now = new Date(); 
     
-    // 👇 NOVO FILTRO SUPER INTELIGENTE
     appointments.value = todosAgendamentos.filter(a => {
-      // 1. É do usuário logado?
       const isOwner = user.value?.type === 'barber' 
         ? a.barberId === String(user.value?.id) 
         : a.clientId === String(user.value?.id);
         
-      // 2. Não está cancelado?
       const isNotCancelled = a.status !== AppointmentStatus.CANCELLED;
-      
-      // 3. Regra dos 30 minutos: O agendamento já expirou?
-      // Transforma a data do banco (2026-04-23) e hora (16:00) em um formato de tempo real
       const dataAgendamento = new Date(`${a.date}T${a.time}:00`); 
-      // Adiciona 30 minutos (30 * 60.000 milissegundos) à hora do agendamento
       const limiteExpiracao = new Date(dataAgendamento.getTime() + (30 * 60000));
-      
-      // O agendamento só aparece se o tempo de "agora" for menor que o "limite de expiração"
       const isNotExpired = now < limiteExpiracao;
 
       return isOwner && isNotCancelled && isNotExpired;
@@ -70,22 +65,51 @@ async function loadDashboardData() {
   }
 }
 
-// 👇 NOVA FUNÇÃO: Conecta o botão à API de Cancelamento
 async function handleCancelAppointment(id: string) {
-  // Pede confirmação antes de cancelar
   if (!window.confirm("Tem certeza que deseja cancelar este agendamento? O horário será liberado.")) return;
-
-  isCanceling.value = id; // Ativa o loading só no botão clicado
-  
+  isCanceling.value = id; 
   try {
     await agendamentoService.cancel(id);
-    // Recarrega os dados para atualizar a lista E os "cards" de estatísticas lá no topo
     await loadDashboardData(); 
   } catch (error) {
     alert("Erro ao cancelar o agendamento. Tente novamente.");
-    console.error(error);
   } finally {
     isCanceling.value = null;
+  }
+}
+
+// 👇 NOVAS FUNÇÕES DE REMARCAR
+function openRescheduleModal(appt: Appointment) {
+  rescheduleAppt.value = appt
+  rescheduleDate.value = ''
+  rescheduleTime.value = ''
+  rescheduleSlots.value = []
+}
+
+async function fetchRescheduleSlots() {
+  if (!rescheduleAppt.value || !rescheduleDate.value) return
+  try {
+    const res = await disponibilidadeService.getSlots(rescheduleAppt.value.barberId, rescheduleDate.value)
+    rescheduleSlots.value = res.data
+  } catch (error) {
+    console.error("Erro ao buscar horários", error)
+  }
+}
+
+async function submitReschedule() {
+  if (!rescheduleAppt.value || !rescheduleDate.value || !rescheduleTime.value) return
+  isRescheduling.value = true
+  try {
+    await agendamentoService.reschedule(rescheduleAppt.value.id, {
+      date: rescheduleDate.value,
+      time: rescheduleTime.value
+    })
+    rescheduleAppt.value = null // Fecha o modal
+    await loadDashboardData()   // Recarrega a tela
+  } catch (error: any) {
+    alert(error.message || "Erro ao remarcar. Este horário pode não estar mais disponível.")
+  } finally {
+    isRescheduling.value = false
   }
 }
 
@@ -93,14 +117,9 @@ async function handleAddService() {
   if (!newService.name || newService.price <= 0) return
   isCreatingService.value = true
   try {
-    await servicoService.create({
-      name: newService.name,
-      price: newService.price,
-      durationMinutes: newService.durationMinutes
-    })
+    await servicoService.create({ name: newService.name, price: newService.price, durationMinutes: newService.durationMinutes })
     showServiceForm.value = false
-    newService.name = ''
-    newService.price = 0
+    newService.name = ''; newService.price = 0;
     await loadDashboardData()
   } catch (error) {
     alert("Erro ao criar serviço")
@@ -142,15 +161,11 @@ function handleLogout() {
         <p class="stat-label">Total</p>
       </div>
       <div class="stat-card">
-        <p class="stat-value">
-          {{ appointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length }}
-        </p>
+        <p class="stat-value">{{ appointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length }}</p>
         <p class="stat-label">Confirmados</p>
       </div>
       <div class="stat-card">
-        <p class="stat-value">
-          {{ appointments.filter(a => a.status === AppointmentStatus.PENDING).length }}
-        </p>
+        <p class="stat-value">{{ appointments.filter(a => a.status === AppointmentStatus.PENDING).length }}</p>
         <p class="stat-label">Pendentes</p>
       </div>
     </div>
@@ -164,12 +179,10 @@ function handleLogout() {
       </div>
 
       <div v-if="showServiceForm" class="service-form">
-        <input v-model="newService.name" type="text" placeholder="Nome do serviço (ex: Corte Degradê)" />
+        <input v-model="newService.name" type="text" placeholder="Nome do serviço" />
         <input v-model.number="newService.price" type="number" placeholder="Preço (R$)" />
         <input v-model.number="newService.durationMinutes" type="number" placeholder="Duração (min)" />
-        <button @click="handleAddService" class="btn primary" :disabled="isCreatingService">
-          {{ isCreatingService ? 'Salvando...' : 'Salvar Serviço' }}
-        </button>
+        <button @click="handleAddService" class="btn primary" :disabled="isCreatingService">Salvar</button>
       </div>
 
       <div class="services-grid">
@@ -177,7 +190,6 @@ function handleLogout() {
           <p class="svc-name">{{ svc.name }}</p>
           <p class="svc-details">R$ {{ svc.price.toFixed(2) }} • {{ svc.durationMinutes }} min</p>
         </div>
-        <p v-if="services.length === 0" class="empty-msg">Nenhum serviço cadastrado.</p>
       </div>
     </div>
 
@@ -185,7 +197,6 @@ function handleLogout() {
       <h2>Agenda de Clientes</h2>
 
       <div v-if="loading" class="state-msg">Carregando…</div>
-
       <div v-else-if="appointments.length === 0" class="empty-state">
         <p>📅</p>
         <p>Nenhum agendamento ainda</p>
@@ -196,26 +207,72 @@ function handleLogout() {
           <div class="appt-left">
             <p class="appt-date">{{ appt.date }} · {{ appt.time }}</p>
             <p class="appt-service">{{ appt.service?.name || 'Serviço' }}</p>
-            
             <p v-if="user?.type === 'barber'" class="appt-client">👤 Cliente: {{ (appt as any).clientName }}</p>
             <p v-else class="appt-client">✂️ Profissional: {{ (appt as any).barberName }}</p>
           </div>
           
           <div class="appt-actions">
-            <span class="appt-status" :class="appt.status">
-              {{ statusLabel[appt.status] }}
-            </span>
+            <span class="appt-status" :class="appt.status">{{ statusLabel[appt.status] }}</span>
             
-            <button 
-              v-if="appt.status !== AppointmentStatus.CANCELLED && appt.status !== AppointmentStatus.COMPLETED"
-              class="btn-cancel"
-              :disabled="isCanceling === appt.id"
-              @click="handleCancelAppointment(appt.id)"
-            >
-              {{ isCanceling === appt.id ? 'Cancelando...' : 'Cancelar' }}
-            </button>
-          </div>
+            <div class="action-buttons">
+              <button 
+                v-if="appt.status !== AppointmentStatus.CANCELLED && appt.status !== AppointmentStatus.COMPLETED"
+                class="btn-reschedule"
+                @click="openRescheduleModal(appt)"
+              >
+                Remarcar
+              </button>
 
+              <button 
+                v-if="appt.status !== AppointmentStatus.CANCELLED && appt.status !== AppointmentStatus.COMPLETED"
+                class="btn-cancel"
+                :disabled="isCanceling === appt.id"
+                @click="handleCancelAppointment(appt.id)"
+              >
+                {{ isCanceling === appt.id ? 'Aguarde...' : 'Cancelar' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="rescheduleAppt" class="modal-overlay" @click.self="rescheduleAppt = null">
+      <div class="modal-content">
+        <h3>Remarcar Horário</h3>
+        <p class="modal-subtitle">Escolha a nova data para o seu agendamento.</p>
+
+        <input 
+          type="date" 
+          v-model="rescheduleDate" 
+          @change="fetchRescheduleSlots" 
+          class="date-input"
+          :min="new Date().toISOString().split('T')[0]"
+        />
+
+        <div v-if="rescheduleSlots.length > 0" class="slots-grid">
+          <button
+            v-for="slot in rescheduleSlots"
+            :key="slot.time"
+            class="slot-btn"
+            :class="{ active: rescheduleTime === slot.time }"
+            :disabled="!slot.available"
+            @click="rescheduleTime = slot.time"
+          >
+            {{ slot.time }}
+          </button>
+        </div>
+        <p v-else-if="rescheduleDate" class="empty-msg-modal">Nenhum horário livre neste dia.</p>
+
+        <div class="modal-actions">
+          <button class="btn ghost" @click="rescheduleAppt = null">Voltar</button>
+          <button 
+            class="btn primary" 
+            :disabled="!rescheduleTime || isRescheduling"
+            @click="submitReschedule"
+          >
+            {{ isRescheduling ? 'Salvando...' : 'Confirmar Nova Data' }}
+          </button>
         </div>
       </div>
     </div>
@@ -224,13 +281,15 @@ function handleLogout() {
 </template>
 
 <style scoped>
+/* COPIE SEU CSS ANTERIOR AQUI, e adicione os trechos abaixo no final */
+
 .dashboard-page { max-width: 900px; margin: 0 auto; padding: 60px 40px; min-height: 100vh; }
 .dash-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px; gap: 20px; flex-wrap: wrap; }
 .eyebrow { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: #d4af37; margin-bottom: 8px; }
 h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
 .subtitle { color: #666; font-size: 14px; }
 .dash-actions { display: flex; gap: 12px; align-items: center; }
-.btn { padding: 12px 24px; border-radius: 11px; font-size: 14px; font-weight: 600; font-family: inherit; text-decoration: none; cursor: pointer; transition: 0.2s; border: none; }
+.btn { padding: 12px 24px; border-radius: 11px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; transition: 0.2s; border: none; text-decoration: none;}
 .btn.primary { background: linear-gradient(135deg, #d4af37, #f1c40f); color: #000; }
 .btn.primary:hover:not(:disabled) { transform: scale(1.03); box-shadow: 0 0 20px rgba(212,175,55,0.4); }
 .btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -240,16 +299,15 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
 .btn.outline:hover { background: rgba(212,175,55,0.1); }
 .btn.small { padding: 8px 16px; font-size: 13px; border-radius: 8px; }
 
-/* STATS */
+/* Stats e Cards */
 .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 48px; }
 .stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; text-align: center; }
 .stat-value { font-size: 40px; font-weight: 700; color: #f1c40f; }
 .stat-label { color: #666; font-size: 13px; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
-/* SERVIÇOS */
 .services-section { margin-bottom: 48px; }
 .section-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.services-section h2, .appointments-section h2 { font-size: 20px; font-weight: 600; color: #ccc;margin-bottom: 24px; }
+.services-section h2, .appointments-section h2 { font-size: 20px; font-weight: 600; color: #ccc; margin-bottom: 24px;}
 .service-form { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; background: rgba(255,255,255,0.02); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px; }
 .service-form input { padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white; font-family: inherit; }
 .service-form input:focus { outline: none; border-color: #d4af37; }
@@ -257,9 +315,7 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
 .service-card { background: rgba(212,175,55,0.05); border: 1px solid rgba(212,175,55,0.15); border-radius: 12px; padding: 16px 20px; min-width: 200px; }
 .svc-name { font-weight: 600; font-size: 16px; margin-bottom: 4px; color: #fff; }
 .svc-details { font-size: 13px; color: #aaa; }
-.empty-msg { color: #666; font-size: 14px; font-style: italic; }
 
-/* LISTA & AÇÕES NO CARD */
 .appointment-list { display: flex; flex-direction: column; gap: 12px; }
 .appt-card { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 20px 24px; transition: 0.2s; }
 .appt-card:hover { border-color: rgba(212,175,55,0.2); }
@@ -267,12 +323,12 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
 .appt-service { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
 .appt-client { font-size: 13px; color: #d4af37; }
 
-/* NOVOS ESTILOS PARA O BOTÃO DE CANCELAR */
+/* Botões do Card */
 .appt-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.btn-cancel { 
+.action-buttons { display: flex; gap: 8px; }
+
+.btn-cancel, .btn-reschedule { 
   background: transparent; 
-  border: 1px solid rgba(231,76,60,0.4); 
-  color: #e74c3c; 
   padding: 6px 0; 
   border-radius: 6px; 
   font-size: 11px; 
@@ -280,66 +336,58 @@ h1 { font-size: 38px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px
   cursor: pointer; 
   text-transform: uppercase; 
   transition: 0.2s; 
-  width: 120px; 
+  width: 90px; /* Diminui um pouco para caber os dois */
   text-align: center; 
   box-sizing: border-box;
 }
 
-.btn-cancel:hover:not(:disabled) { 
-  background: rgba(231,76,60,0.1); 
-  border-color: #e74c3c; 
-}
-.btn-cancel:disabled { 
-  opacity: 0.5; 
-  cursor: not-allowed; 
-}
+.btn-cancel { border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; }
+.btn-cancel:hover:not(:disabled) { background: rgba(231,76,60,0.1); border-color: #e74c3c; }
+
+/* Novo botão Remarcar Amarelo */
+.btn-reschedule { border: 1px solid rgba(241,196,15,0.4); color: #f1c40f; }
+.btn-reschedule:hover:not(:disabled) { background: rgba(241,196,15,0.1); border-color: #f1c40f; }
 
 .appt-status { 
-  font-size: 11px; 
-  font-weight: 700; 
-  padding: 6px 0; 
-  border-radius: 6px; 
-  letter-spacing: 0.5px; 
-  text-transform: uppercase; 
-  text-align: center; 
-  display: inline-block;
-  width: 120px; 
+  font-size: 11px; font-weight: 700; padding: 6px 0; border-radius: 6px; 
+  letter-spacing: 0.5px; text-transform: uppercase; text-align: center; 
+  display: inline-block; width: 188px; /* Largura para alinhar com os dois botões */
   box-sizing: border-box;
 }
+.appt-status.confirmado { background: rgba(39,174,96,0.1); color: #2ecc71; border: 1px solid rgba(39,174,96,0.3); }
+.appt-status.pendente { background: rgba(241,196,15,0.1); color: #f1c40f; border: 1px solid rgba(241,196,15,0.3); }
+.appt-status.Cancelado { background: rgba(231,76,60,0.1); color: #e74c3c; }
 
-/* 👇 As novas classes em português */
-.appt-status.confirmado { 
-  background: rgba(39,174,96,0.1); 
-  color: #2ecc71; 
-  border: 1px solid rgba(39,174,96,0.3); /* Cara de botão */
-}
-.appt-status.pendente { 
-  background: rgba(241,196,15,0.1); 
-  color: #f1c40f; 
-  border: 1px solid rgba(241,196,15,0.3);
-}
-.appt-status.Cancelado { 
-  background: rgba(231,76,60,0.1); 
-  color: #e74c3c; 
-}
-.empty-state { 
-  text-align: center; 
-  padding: 80px 20px; 
-  color: #888; 
-  background: rgba(255, 255, 255, 0.02); /* Fundo de card sutil */
-  border: 1px dashed rgba(255, 255, 255, 0.15); /* Borda tracejada (estilo "vazio") */
-  border-radius: 16px; 
-  margin-top: 10px;
-}
+.empty-state { text-align: center; padding: 80px 20px; color: #888; background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 16px; margin-top: 10px; }
+.empty-state p:first-child { font-size: 54px; margin-bottom: 16px; }
+.empty-state p:last-child { font-size: 16px; font-weight: 500; color: #aaa; }
 
-.empty-state p:first-child { 
-  font-size: 54px; /* Emote grandão */
-  margin-bottom: 16px; 
+/* 👇 ESTILOS DO MODAL DE REMARCAR */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+  display: flex; justify-content: center; align-items: center; z-index: 1000;
 }
-
-.empty-state p:last-child { 
-  font-size: 16px; 
-  font-weight: 500;
-  color: #aaa;
+.modal-content {
+  background: #181818; border: 1px solid rgba(212,175,55,0.2);
+  padding: 32px; border-radius: 16px; width: 90%; max-width: 420px;
 }
+.modal-content h3 { font-size: 24px; color: #fff; margin-bottom: 4px; }
+.modal-subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+.date-input {
+  width: 100%; padding: 14px; border-radius: 8px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: white; font-family: inherit; margin-bottom: 20px; color-scheme: dark;
+}
+.date-input:focus { outline: none; border-color: #d4af37; }
+.slots-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+.slot-btn {
+  padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+  background: transparent; color: #fff; cursor: pointer; transition: 0.2s; font-weight: 600;
+}
+.slot-btn:hover:not(:disabled) { border-color: #d4af37; color: #d4af37; }
+.slot-btn.active { background: #d4af37; color: #000; border-color: #d4af37; }
+.slot-btn:disabled { opacity: 0.2; cursor: not-allowed; text-decoration: line-through; }
+.empty-msg-modal { color: #e74c3c; font-size: 13px; text-align: center; margin-bottom: 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
 </style>
