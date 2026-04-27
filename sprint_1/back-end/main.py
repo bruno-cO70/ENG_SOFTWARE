@@ -2,11 +2,13 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi import BackgroundTasks
 import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext # <-- IMPORTAÇÃO DA CRIPTOGRAFIA
 import models
 import database
+import email_service
 
 
 SECRET_KEY = "chave_super_secreta_do_hairtime"
@@ -117,7 +119,7 @@ def get_disponibilidade(profissional_id: str, data: str, db: Session = Depends(d
     return {"data": slots}
 
 @app.post("/api/agendamentos")
-def create_agendamento(appt: AgendamentoCreate, db: Session = Depends(database.get_db)):
+def create_agendamento(appt: AgendamentoCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
     novo_agendamento = models.Agendamento(
         profissional_id=int(appt.barberId),
         cliente_id=int(appt.clientId),
@@ -128,8 +130,23 @@ def create_agendamento(appt: AgendamentoCreate, db: Session = Depends(database.g
     )
     db.add(novo_agendamento)
     db.commit()
-    return {"data": {"id": "sucesso", "status": "confirmado"}}
+    
+    # 👇 A MÁGICA ACONTECE AQUI
+    # 1. Busca os dados do cliente que acabou de agendar
+    cliente = db.query(models.Usuario).filter(models.Usuario.id == int(appt.clientId)).first()
+    
+    if cliente:
+        # 2. Usa o "BackgroundTasks" para mandar o e-mail em segundo plano. 
+        # Assim o Front-end não fica travado carregando enquanto o e-mail é enviado!
+        background_tasks.add_task(
+            email_service.enviar_email_confirmacao, 
+            destinatario=cliente.email, 
+            nome_cliente=cliente.nome,
+            data=appt.date, 
+            horario=appt.time
+        )
 
+    return {"data": {"id": "sucesso", "status": "confirmado"}}
 @app.get("/api/agendamentos")
 def listar_agendamentos(db: Session = Depends(database.get_db)):
     agendamentos = db.query(models.Agendamento).all()
@@ -171,7 +188,7 @@ def cancelar_agendamento(agendamento_id: int, db: Session = Depends(database.get
     return {"message": "Agendamento cancelado com sucesso", "status_atual": agendamento.status}
 
 @app.put("/api/agendamentos/{agendamento_id}")
-def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, db: Session = Depends(database.get_db)):
+def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
     # 1. Busca o agendamento original
     agendamento = db.query(models.Agendamento).filter(models.Agendamento.id == agendamento_id).first()
     
@@ -181,7 +198,7 @@ def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, db
     if agendamento.status == "Cancelado":
         raise HTTPException(status_code=400, detail="Não é possível remarcar um agendamento cancelado")
 
-    # 2. Valida se o novo horário não está no passado (Máquina do tempo bloqueada!)
+    # 2. Validações de data no passado e conflito (mantidas iguais)
     agora = datetime.now()
     data_hoje_str = agora.strftime("%Y-%m-%d")
     hora_atual_str = agora.strftime("%H:%M")
@@ -189,13 +206,12 @@ def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, db
     if novos_dados.date < data_hoje_str or (novos_dados.date == data_hoje_str and novos_dados.time <= hora_atual_str):
         raise HTTPException(status_code=400, detail="Não é possível remarcar para um horário no passado")
 
-    # 3. Valida se o novo horário já está ocupado por OUTRO agendamento
     conflito = db.query(models.Agendamento).filter(
         models.Agendamento.profissional_id == agendamento.profissional_id,
         models.Agendamento.data == novos_dados.date,
         models.Agendamento.horario == novos_dados.time,
         models.Agendamento.status != "Cancelado",
-        models.Agendamento.id != agendamento_id # Ignora ele mesmo na busca
+        models.Agendamento.id != agendamento_id 
     ).first()
 
     if conflito:
@@ -207,6 +223,16 @@ def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, db
     
     db.commit()
     db.refresh(agendamento)
+
+    # 👇 A MÁGICA DA REMARCAÇÃO AQUI
+    if agendamento.cliente: # Pega os dados do cliente que já estão amarrados no agendamento
+        background_tasks.add_task(
+            email_service.enviar_email_remarcacao,
+            destinatario=agendamento.cliente.email,
+            nome_cliente=agendamento.cliente.nome,
+            nova_data=agendamento.data,
+            novo_horario=agendamento.horario
+        )
 
     return {
         "message": "Agendamento remarcado com sucesso!", 
@@ -264,3 +290,12 @@ def verificar_sessao(): return {"status": "ok"}
 
 @app.post("/api/auth/sair")
 def deslogar(): return {"message": "Sessão encerrada"}
+
+@app.post("/api/teste-email")
+def testar_envio_de_email(email_destino: str):
+    sucesso = email_service.enviar_email_teste(email_destino)
+    
+    if sucesso:
+        return {"message": f"E-mail enviado com sucesso para {email_destino}!"}
+    
+    raise HTTPException(status_code=500, detail="Falha ao enviar e-mail. Verifique os logs do terminal.")
