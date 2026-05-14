@@ -20,7 +20,6 @@ const {
 } = useScheduler()
 
 onMounted(async () => {
-  // Agora a tela começa buscando os barbeiros, não os serviços!
   await loadProfessionals()
 })
 
@@ -34,17 +33,19 @@ const handleSchedule = async () => {
 </script>
 
 <template>
-  <div class="scheduler-page">
-    <div class="scheduler-card">
-      <p class="eyebrow">Novo Agendamento</p>
-      <h1>Escolha seu <span class="highlight">Horário</span></h1>
+  <div class="page-container">
+    <div class="glass-card scheduler-card">
+      <div class="scheduler-header">
+        <span class="eyebrow">NOVO AGENDAMENTO</span>
+        <h1 class="serif-title">Escolha seu <span class="gold-text">Horário</span></h1>
+      </div>
 
       <div v-if="error" class="error-msg">{{ error }}</div>
 
       <div class="form-container">
         
         <div class="field">
-          <label>1. Escolha o Profissional</label>
+          <label>1. Profissional</label>
           <select v-model="selectedBarberId" :disabled="loading">
             <option value="" disabled>Selecione quem vai te atender...</option>
             <option v-for="prof in professionals" :key="prof.id" :value="prof.id">
@@ -55,12 +56,12 @@ const handleSchedule = async () => {
 
         <transition name="fade">
           <div class="field" v-if="selectedBarberId">
-            <label>2. Qual serviço deseja?</label>
+            <label>2. Serviço</label>
             <div v-if="services.length === 0 && loading" class="loading-msg">Carregando serviços...</div>
             <select v-else v-model="selectedServiceId" :disabled="loading">
-              <option value="" disabled>Selecione um serviço...</option>
+              <option value="" disabled>Selecione o serviço...</option>
               <option v-for="svc in services" :key="svc.id" :value="svc.id">
-                {{ svc.name }} ({{ svc.durationMinutes }} min) - R$ {{ svc.price.toFixed(2) }}
+                {{ svc.name }} ({{ svc.durationMinutes }}m) - R$ {{ svc.price.toFixed(2) }}
               </option>
             </select>
           </div>
@@ -68,7 +69,7 @@ const handleSchedule = async () => {
 
         <transition name="fade">
           <div class="field" v-if="selectedServiceId">
-            <label>3. Escolha o dia</label>
+            <label>3. Data</label>
             <input 
               type="date" 
               :value="selectedDate"
@@ -81,30 +82,29 @@ const handleSchedule = async () => {
 
         <transition name="fade">
           <div class="field" v-if="selectedDate">
-            <label>4. Escolha o horário</label>
-            <div v-if="loading" class="loading-msg">Buscando horários disponíveis...</div>
+            <label>4. Horário</label>
+            <div v-if="loading" class="loading-msg">Buscando horários...</div>
             
-            <div v-else-if="availableSlots.length > 0" class="time-grid">
-              <button
-                v-for="slot in availableSlots"
-                :key="slot.time"
-                :class="['time-btn', { 
-                  selected: selectedTime === slot.time,
-                  unavailable: !slot.available 
-                }]"
-                :disabled="!slot.available"
-                @click="selectedTime = slot.time"
-              >
-                {{ slot.time }}
-              </button>
+            <div v-else-if="availableSlots.length > 0" class="time-grid-wrapper">
+              <div class="time-grid">
+                <button
+                  v-for="slot in availableSlots"
+                  :key="slot.time"
+                  :class="['time-btn', { selected: selectedTime === slot.time, unavailable: !slot.available }]"
+                  :disabled="!slot.available"
+                  @click="selectedTime = slot.time"
+                >
+                  {{ slot.time }}
+                </button>
+              </div>
             </div>
             
-            <div v-else class="empty-msg">Nenhum horário disponível nesta data.</div>
+            <div v-else class="empty-msg">Nenhum horário livre.</div>
           </div>
         </transition>
 
         <button 
-          class="submit-btn" 
+          class="btn primary-gold submit-btn" 
           :disabled="!selectedDate || !selectedTime || !selectedServiceId || !selectedBarberId || loading"
           @click="handleSchedule"
         >
@@ -118,160 +118,69 @@ const handleSchedule = async () => {
 </template>
 
 <style scoped>
-.scheduler-page {
-  min-height: 80vh;
-  display: flex;
-  justify-content: center;
-  padding: 60px 20px;
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
+
+.page-container {
+  min-height: 100vh;
+  background-color: #050505;
+  background-image: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.05) 0%, transparent 60%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 80px 20px 20px 20px; /* Offset Navbar */
 }
 
-.scheduler-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 24px;
-  padding: 48px;
-  width: 100%;
-  max-width: 600px;
-  backdrop-filter: blur(20px);
+.glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px; backdrop-filter: blur(20px);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+  width: 100%; max-width: 480px; 
+  padding: 40px; 
+  max-height: calc(100vh - 100px); /* Proteção anti-vazamento */
+  overflow-y: auto;
 }
+.glass-card::-webkit-scrollbar { width: 4px; }
+.glass-card::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.3); border-radius: 4px; }
 
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: #d4af37;
-  margin-bottom: 8px;
-  text-align: center;
-}
+.scheduler-header { text-align: center; margin-bottom: 24px; }
+.eyebrow { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: #888; margin-bottom: 8px; display: block; font-family: 'Inter', sans-serif;}
+.serif-title { font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 600; margin-bottom: 4px; color: #fff; }
+.gold-text { background: linear-gradient(135deg, #d4af37, #f1c40f); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-h1 {
-  font-size: 32px;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 40px;
-}
+.form-container { display: flex; flex-direction: column; gap: 16px; }
 
-.highlight {
-  background: linear-gradient(135deg, #d4af37, #f1c40f);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; font-family: 'Inter', sans-serif;}
+.field input, .field select { padding: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white; font-size: 14px; font-family: 'Inter', sans-serif; transition: border-color 0.2s; outline: none; }
+.field input:focus, .field select:focus { border-color: #d4af37; }
 
-.form-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
+::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Wrapper bloqueia o vazamento e cria scroll na grade de botões */
+.time-grid-wrapper {
+  max-height: 130px; 
+  overflow-y: auto;
+  padding-right: 4px;
 }
+.time-grid-wrapper::-webkit-scrollbar { width: 4px; }
+.time-grid-wrapper::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.3); border-radius: 4px; }
 
-.field label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #ccc;
-}
+.time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 
-.field input, .field select {
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(0,0,0,0.4);
-  color: white;
-  font-size: 16px;
-  font-family: inherit;
-  transition: border-color 0.2s;
-}
+.time-btn { background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+.time-btn:hover:not(:disabled) { border-color: #d4af37; background: rgba(212, 175, 55, 0.05); }
+.time-btn.selected { background: linear-gradient(135deg, #d4af37, #f1c40f); color: #000; border-color: transparent; font-weight: 600; }
+.time-btn.unavailable { border-color: rgba(255,255,255,0.05); color: #444; cursor: not-allowed; text-decoration: line-through; }
 
-.field input:focus, .field select:focus {
-  outline: none;
-  border-color: #d4af37;
-}
+.btn { display: inline-flex; justify-content: center; align-items: center; padding: 16px; font-weight: 600; cursor: pointer; transition: 0.3s ease; border: none; font-family: 'Inter', sans-serif; border-radius: 4px; font-size: 15px; }
+.primary-gold { background: linear-gradient(135deg, #d4af37, #f1c40f); color: #000; }
+.primary-gold:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(212, 175, 55, 0.3); }
+.primary-gold:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Color schemes for date picker calendar icon (usually black/gray by default in browsers) */
-::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-}
+.submit-btn { margin-top: 10px; }
+.error-msg { background: rgba(231, 76, 60, 0.1); color: #e74c3c; padding: 12px; border-radius: 4px; border: 1px solid rgba(231, 76, 60, 0.2); text-align: center; font-size: 13px;}
+.empty-msg, .loading-msg { color: #888; font-size: 13px; font-style: italic; }
 
-.time-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
-}
-
-.time-btn {
-  background: transparent;
-  border: 1px solid rgba(212, 175, 55, 0.5);
-  color: #fff;
-  padding: 14px;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.time-btn:hover:not(:disabled) {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: #f1c40f;
-}
-
-.time-btn.selected {
-  background: linear-gradient(135deg, #d4af37, #f1c40f);
-  color: #000;
-  border-color: transparent;
-}
-
-.time-btn.unavailable {
-  border-color: rgba(255,255,255,0.1);
-  color: #555;
-  cursor: not-allowed;
-  text-decoration: line-through;
-}
-
-.submit-btn {
-  margin-top: 20px;
-  padding: 18px;
-  border-radius: 14px;
-  border: none;
-  font-size: 18px;
-  font-weight: 700;
-  font-family: inherit;
-  background: linear-gradient(135deg, #d4af37, #f1c40f);
-  color: #000;
-  cursor: pointer;
-  transition: 0.25s;
-}
-
-.submit-btn:hover:not(:disabled) {
-  transform: scale(1.02);
-  box-shadow: 0 0 24px rgba(212, 175, 55, 0.4);
-}
-
-.submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #555;
-  color: #888;
-}
-
-.error-msg {
-  background: rgba(231, 76, 60, 0.1);
-  color: #e74c3c;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(231, 76, 60, 0.2);
-  text-align: center;
-  font-weight: 600;
-}
-
-.empty-msg, .loading-msg {
-  color: #888;
-  padding: 10px 0;
-  font-style: italic;
-}
-</style>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>  

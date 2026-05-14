@@ -3,23 +3,24 @@ import HomeView from '@/views/HomeView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  
+  // 👇 1. SCROLL BEHAVIOR CORRIGIDO (Faz a tela deslizar até as âncoras #)
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    } else if (to.hash) {
+      return { el: to.hash, top:100, behavior: 'smooth' }
+    } else {
+      return { top: 0 }
+    }
+  },
+
   routes: [
     {
       path: '/',
       name: 'home',
       component: HomeView,
     },
-    {
-      path: '/sobre',
-      name: 'sobre',
-      component: () => import('@/views/SobreView.vue'),
-    },
-    {
-      path: '/beneficios',
-      name: 'beneficios',
-      component: () => import('@/views/BeneficiosView.vue'),
-    },
-    // ----------------------------------
     {
       path: '/agendar',
       name: 'scheduler',
@@ -30,6 +31,12 @@ const router = createRouter({
       name: 'cadastro',
       component: () => import('@/views/CadastroView.vue'),
     },
+    // 👇 2. ROTA DE LOGIN ADICIONADA (Para não quebrar o botão do menu)
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/CadastroView.vue'),
+    },
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -37,16 +44,13 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
   ],
-  scrollBehavior() {
-    return { top: 0 }
-  },
 })
 
 // Guard simples — a view também redireciona, mas aqui é a camada de rota
 router.beforeEach((to) => {
   if (to.meta.requiresAuth) {
     const token = localStorage.getItem('hairtime_token')
-    if (!token) return { name: 'cadastro' }
+    if (!token) return { name: 'cadastro' } // Manda o usuário intruso fazer login
   }
 })
 
