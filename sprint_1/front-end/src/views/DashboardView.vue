@@ -374,7 +374,25 @@ const statusLabel: Record<AppointmentStatus, string> = {
   align-items: flex-end; 
   gap: 10px; 
 }
+/* ==========================================
+ * ESTADO VAZIO (NENHUM AGENDAMENTO)
+ * ========================================== */
+.empty-state { 
+  text-align: center; 
+  padding: 60px 20px; 
+  color: #888; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center;
+}
 
+.empty-icon { 
+  font-size: 48px; 
+  margin-bottom: 16px; 
+  opacity: 0.5; 
+  display: block;
+}
 /* 1. Etiqueta de Status (Confirmado/Pendente) */
 .appt-status-badge { 
   font-size: 11px; 
@@ -388,7 +406,7 @@ const statusLabel: Record<AppointmentStatus, string> = {
   box-sizing: border-box; 
 }
 
-/* Deixei as bordas um pouco mais visíveis para igualar com as de baixo */
+q
 .appt-status-badge.pendente { color: #f1c40f; background: rgba(241, 196, 15, 0.05); border: 1px solid rgba(241, 196, 15, 0.4); }
 .appt-status-badge.confirmado { color: #2ecc71; background: rgba(46, 204, 113, 0.05); border: 1px solid rgba(46, 204, 113, 0.4); }
 .appt-status-badge.Cancelado { color: #e74c3c; background: rgba(231, 76, 60, 0.05); border: 1px solid rgba(231, 76, 60, 0.4); } 
