@@ -27,6 +27,7 @@ function handleLogout() {
       <div class="nav-actions">
         <template v-if="isAuthenticated">
           <span class="user-greeting">Olá, {{ user?.name?.split(' ')[0] }}</span>
+          
           <router-link to="/dashboard" class="btn outline-gold small">Painel</router-link>
           <router-link to="/agendar" class="btn primary-gold small">Agendar</router-link>
           <button class="btn ghost-gold small" @click="handleLogout">Sair</button>
