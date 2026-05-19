@@ -22,9 +22,9 @@ onUnmounted(() => window.removeEventListener('scroll', updateScroll))
  * HEURÍSTICA 8: Estética e design minimalista (Acordeões)
  * ========================================== */
 const faqItems = ref([
-  { question: "Como funciona o agendamento online?", answer: "Você escolhe o profissional, o serviço e o horário desejado em poucos cliques.", isOpen: false },
-  { question: "Posso remarcar meu horário?", answer: "Sim! Pelo seu painel você pode remarcar com até 2h de antecedência.", isOpen: false },
-  { question: "Quais marcas de produtos vocês utilizam?", answer: "Trabalhamos apenas com linhas premium reconhecidas internacionalmente.", isOpen: false }
+  { question: "Como funciona o sistema de agendamentos?", answer: "Os clientes escolhem o serviço, a data e o horário disponível diretamente pela plataforma, enquanto o profissional gerencia toda a agenda em tempo real.", isOpen: false },
+  { question: "Clientes conseguem agendar online?", answer: "Sim. Os clientes podem realizar agendamentos online de forma rápida, prática e sem precisar entrar em contato manualmente.", isOpen: false },
+  { question: "Posso gerenciar meus horários e serviços?", answer: "Sim. O profissional pode cadastrar serviços, definir horários disponíveis e organizar todos os atendimentos pela plataforma.", isOpen: false }
 ])
 
 function toggleFaq(index: number) {
@@ -83,9 +83,8 @@ async function handleLeadSubmit() {
       <section class="hero-section">
         <div class="glass-card dual-card">
           <div class="dual-content">
-            <span class="eyebrow">HairTime Salon</span>
-            <h1 class="serif-title">Transforme-se<br>no nosso <span class="gold-text">salão</span></h1>
-            <p>Cabelo, penteados, manicure e pedicure. A melhor experiência em beleza com gestão inteligente.</p>
+            <h1 class="serif-title">Gestão inteligente para <span class="gold-text">cabeleireiros e clientes</span></h1>
+            <p>Organize sua agenda, gerencie atendimentos e permita que clientes agendem horários online de forma rápida e prática.</p>
             
             <div class="hero-actions">
               <a href="#servicos" class="btn outline-gold large">Conheça nossos serviços</a>
@@ -103,10 +102,11 @@ async function handleLeadSubmit() {
             <span class="image-label"></span>
           </div>
           <div class="dual-content">
-            <span class="eyebrow">Sobre nós</span>
-            <h2 class="serif-title">Paixão pela <span class="gold-text">beleza</span></h2>
-            <p>Nascemos do desejo de fazer a diferença na vida das pessoas, entregando não apenas estética, mas autoestima e bem-estar em um ambiente acolhedor e luxuoso.</p>
-            <router-link to="/sobre" class="btn outline-gold">Saiba mais</router-link>
+            <span class="eyebrow">SOBRE O HAIRTIME</span>
+            <h2 class="serif-title">Gestão inteligente para <span class="gold-text">salões modernos</span></h2>
+            <p>O HairTime conecta clientes e profissionais através de uma plataforma moderna de agendamentos, organização de atendimentos e controle da rotina do salão.</p>
+            <p>Com uma experiência prática e intuitiva, cabeleireiros podem gerenciar horários, serviços e acompanhar seus resultados, enquanto clientes realizam agendamentos online de forma rápida e simples.</p>
+            <router-link to="/cadastro" class="btn outline-gold">Conhecer plataforma</router-link>
           </div>
         </div>
       </section>
@@ -119,24 +119,18 @@ async function handleLeadSubmit() {
 
         <div class="features-grid">
           <div class="glass-card service-card">
-            <div class="card-img placeholder-corte"></div>
-            <h3 class="serif-title small">Corte de cabelo</h3>
-            <p>Realce sua beleza e autoconfiança com cortes personalizados e alinhados às tendências.</p>
-            <router-link to="/servicos" class="btn ghost-gold">Ver detalhes</router-link>
+            <h3 class="serif-title small">📅 Agendamentos online</h3>
+            <p>Clientes podem agendar horários de forma simples e rápida, sem necessidade de ligações ou mensagens.</p>
           </div>
 
           <div class="glass-card service-card featured">
-            <div class="card-img placeholder-cor"></div>
-            <h3 class="serif-title small">Coloração Premium</h3>
-            <p>Eleve sua autoconfiança através de cores deslumbrantes com produtos importados.</p>
-            <router-link to="/servicos" class="btn ghost-gold">Ver detalhes</router-link>
+            <h3 class="serif-title small">📊 Controle do salão</h3>
+            <p>Acompanhe atendimentos, horários e rendimento mensal em um painel completo de gestão.</p>
           </div>
 
           <div class="glass-card service-card">
-            <div class="card-img placeholder-unhas"></div>
-            <h3 class="serif-title small">Manicure e Pedicure</h3>
-            <p>Oferecemos o melhor tratamento para a saúde e estética das suas mãos e pés.</p>
-            <router-link to="/servicos" class="btn ghost-gold">Ver detalhes</router-link>
+            <h3 class="serif-title small">🔔 Notificações automáticas</h3>
+            <p>Confirmações e lembretes de agendamento para clientes e profissionais.</p>
           </div>
         </div>
       </section>
@@ -165,8 +159,8 @@ async function handleLeadSubmit() {
 
       <section class="contact-section">
         <div class="glass-card contact-card">
-          <h2 class="serif-title">Receba nossas <span class="gold-text">novidades</span></h2>
-          <p>Assine nossa newsletter para dicas exclusivas de beleza e promoções do salão.</p>
+          <h2 class="serif-title">Receba nossas <span class="gold-text">atualizações</span></h2>
+          <p>Fique por dentro das novidades da plataforma, novos recursos, melhorias no sistema e dicas para otimizar a gestão do seu salão.</p>
 
           <form @submit.prevent="handleLeadSubmit" class="lead-form" novalidate>
             <div class="form-group">
@@ -188,7 +182,7 @@ async function handleLeadSubmit() {
             >
               <span v-if="isSubmitting">Inscrevendo...</span>
               <span v-else-if="submitSuccess">Inscrito com sucesso! ✓</span>
-              <span v-else>Assinar Newsletter</span>
+              <span v-else>Receber novidades</span>
             </button>
           </form>
         </div>
@@ -282,9 +276,9 @@ async function handleLeadSubmit() {
  * COMPONENTES DE TEXTO E BOTÕES
  * ========================================== */
 .eyebrow { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: #d4af37; margin-bottom: 16px; display: block; }
-h1.serif-title { font-size: clamp(48px, 4.5vw, 72px); margin-bottom: 24px; }
-h2.serif-title { font-size: clamp(36px, 4vw, 48px); margin-bottom: 24px; }
-h3.serif-title.small { font-size: 24px; margin-bottom: 12px; }
+h1.serif-title { font-size: clamp(32px, 3.5vw, 52px); margin-bottom: 24px; }
+h2.serif-title { font-size: clamp(28px, 3.2vw, 40px); margin-bottom: 24px; }
+h3.serif-title.small { font-size: 20px; margin-bottom: 12px; }
 
 p { color: #999; line-height: 1.6; font-size: 15px; font-weight: 300; }
 
@@ -319,8 +313,8 @@ p { color: #999; line-height: 1.6; font-size: 15px; font-weight: 300; }
  
 .dual-card { display: grid; grid-template-columns: 1fr 1fr; min-height: 500px; }
 .dual-card.flipped { grid-template-columns: 1fr 1fr; }
-.dual-content { padding: 80px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
-.dual-content p { margin-bottom: 40px; font-size: 18px; max-width: 450px; }
+.dual-content { padding: 60px 80px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.dual-content p { margin-bottom: 32px; font-size: 16px; max-width: 550px; line-height: 1.7; word-spacing: 0.1em; }
 
 /* Placeholders para Imagens */
 .dual-image { background: #0a0a0a; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.02); }
@@ -359,10 +353,10 @@ p { color: #999; line-height: 1.6; font-size: 15px; font-weight: 300; }
  * FAQ
  * ========================================== */
  .faq-question .serif-title {
-  font-size: 20px; 
+  font-size: 18px; 
 }
 .faq-answer p {
-  font-size: 14px; 
+  font-size: 15px; line-height: 1.6;
 }
 .faq-container { padding: 60px; max-width: 800px; margin: 0 auto; width: 100%; text-align: center; }
 .faq-list { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; text-align: left; }

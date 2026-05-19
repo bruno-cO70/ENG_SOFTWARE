@@ -117,7 +117,6 @@ async function submitReschedule() {
 }
 
 async function handleAddService() {
-
   if (!newService.name || !newService.price || !newService.durationMinutes) return
   
   isCreatingService.value = true
@@ -158,6 +157,23 @@ const statusLabel: Record<AppointmentStatus, string> = {
         <span class="eyebrow">Dashboard</span>
         <h1 class="serif-title">Olá, <span class="gold-text">{{ user?.name?.split(' ')[0] || 'Profissional' }}</span></h1>
         <p class="subtitle">{{ user?.type === 'barber' ? 'Painel de gestão da barbearia' : 'Acompanhe seus horários agendados' }}</p>
+      </div>
+
+      <div v-if="user?.type === 'barber'" class="admin-quick-menu">
+        <router-link to="/servicos" class="glass-card menu-card">
+          <span class="menu-icon">✂️</span>
+          <span class="menu-text">Gerenciar<br><strong>Serviços</strong></span>
+        </router-link>
+        
+        <router-link to="/profissionais" class="glass-card menu-card">
+          <span class="menu-icon">👥</span>
+          <span class="menu-text">Gerenciar<br><strong>Equipe</strong></span>
+        </router-link>
+        
+        <router-link to="/relatorios" class="glass-card menu-card">
+          <span class="menu-icon">📊</span>
+          <span class="menu-text">Acessar<br><strong>Relatórios</strong></span>
+        </router-link>
       </div>
 
       <div class="stats-row">
@@ -321,6 +337,58 @@ const statusLabel: Record<AppointmentStatus, string> = {
 .eyebrow { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: #d4af37; margin-bottom: 12px; display: block; font-weight: 600; }
 .subtitle { color: #888; font-size: 14px; margin-bottom: 40px; }
 
+/* ==========================================
+ * MENU DE GESTÃO RÁPIDA (DASHBOARD)
+ * ========================================== */
+.admin-quick-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px; 
+}
+
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  text-decoration: none;
+  color: #fff;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.menu-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.menu-icon {
+  font-size: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.menu-text {
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.4;
+}
+
+.menu-text strong {
+  font-size: 16px;
+  color: #fff;
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
 /* Padrão Glass Card Reto (Editorial) */
 .glass-card {
   background: rgba(255, 255, 255, 0.02);
@@ -406,7 +474,6 @@ const statusLabel: Record<AppointmentStatus, string> = {
   box-sizing: border-box; 
 }
 
-q
 .appt-status-badge.pendente { color: #f1c40f; background: rgba(241, 196, 15, 0.05); border: 1px solid rgba(241, 196, 15, 0.4); }
 .appt-status-badge.confirmado { color: #2ecc71; background: rgba(46, 204, 113, 0.05); border: 1px solid rgba(46, 204, 113, 0.4); }
 .appt-status-badge.Cancelado { color: #e74c3c; background: rgba(231, 76, 60, 0.05); border: 1px solid rgba(231, 76, 60, 0.4); } 

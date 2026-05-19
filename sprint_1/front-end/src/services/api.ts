@@ -145,6 +145,17 @@ export const servicoService = {
       body: JSON.stringify(payload),
     })
   },
+
+  update(id: string, payload: { name: string; price: number; durationMinutes: number }): Promise<ApiResponse<Service>> {
+    return request(`/servicos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  delete(id: string): Promise<ApiResponse<any>> {
+    return request(`/servicos/${id}`, { method: 'DELETE' })
+  },
 }
 
 // ─────────────────────────────────────────────
@@ -169,4 +180,34 @@ export const profissionalService = {
   get(id: string): Promise<ApiResponse<User>> {
     return request(`/profissionais/${id}`)
   },
+
+  create(payload: { name: string; email: string; phone?: string }): Promise<ApiResponse<User>> {
+    return request('/profissionais', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  update(id: string, payload: { name?: string; email?: string; phone?: string }): Promise<ApiResponse<User>> {
+    return request(`/profissionais/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  delete(id: string): Promise<ApiResponse<any>> {
+    return request(`/profissionais/${id}`, { method: 'DELETE' })
+  },
+}
+// ─────────────────────────────────────────────
+//  RELATÓRIOS GERENCIAIS
+// ─────────────────────────────────────────────
+export const relatorioService = {
+  get(params?: { dataInicio?: string; dataFim?: string }): Promise<ApiResponse<any>> {
+    const query = new URLSearchParams()
+    if (params?.dataInicio) query.append('data_inicio', params.dataInicio)
+    if (params?.dataFim) query.append('data_fim', params.dataFim)
+    
+    return request(`/relatorios?${query.toString()}`)
+  }
 }

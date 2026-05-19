@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, Header
 import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext # <-- IMPORTAÇÃO DA CRIPTOGRAFIA
@@ -24,6 +24,44 @@ def verify_password(plain_password, hashed_password):
 
 def get_password_hash(password):
     return pwd_context.hash(password)
+
+# ---------------------------------------------------------
+# RBAC - CONTROLE DE ACESSO POR ROLE (Role-Based Access Control)
+# ---------------------------------------------------------
+def get_current_user(authorization: str = Header(None), db: Session = Depends(database.get_db)):
+    """Extrai e valida o token JWT, retorna o usuário autenticado."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Token não fornecido")
+    
+    try:
+        # Remove o prefixo "Bearer "
+        token = authorization.split(" ")[1] if " " in authorization else authorization
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except (jwt.InvalidTokenError, IndexError):
+        raise HTTPException(status_code=401, detail="Token inválido")
+    
+    user = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    
+    return user
+
+def require_admin(current_user: models.Usuario = Depends(get_current_user)):
+    """Verifica se o usuário é ADMIN. Se não for, retorna 403 Forbidden."""
+    if current_user.tipo != "barber":  # Apenas barbeiro/admin pode gerenciar
+        raise HTTPException(status_code=403, detail="Acesso negado. Apenas administradores podem acessar este recurso.")
+    return current_user
+
+def require_barber(current_user: models.Usuario = Depends(get_current_user)):
+    """Verifica se o usuário é barbeiro."""
+    if current_user.tipo != "barber":
+        raise HTTPException(status_code=403, detail="Acesso negado. Apenas profissionais podem acessar este recurso.")
+    return current_user
 
 models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI()
@@ -66,11 +104,21 @@ class LoginSchema(BaseModel):
     email: str
     password: str
 
+class ProfissionalCreate(BaseModel):
+    name: str
+    email: str
+    phone: str | None = None
+
+class ProfissionalUpdate(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+
 # ---------------------------------------------------------
 # ROTAS DE SERVIÇOS E AGENDAMENTOS
 # ---------------------------------------------------------
 @app.post("/api/servicos")
-def criar_servico(servico: ServicoCreate, db: Session = Depends(database.get_db)):
+def criar_servico(servico: ServicoCreate, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
     novo_servico = models.Servico(nome=servico.name, preco=servico.price, duracao=servico.durationMinutes)
     db.add(novo_servico)
     db.commit()
@@ -82,6 +130,29 @@ def listar_servicos(db: Session = Depends(database.get_db)):
     servicos = db.query(models.Servico).all()
     lista = [{"id": str(s.id), "name": s.nome, "durationMinutes": s.duracao, "price": s.preco} for s in servicos]
     return {"data": lista}
+
+@app.put("/api/servicos/{servico_id}")
+def atualizar_servico(servico_id: int, servico: ServicoCreate, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
+    db_servico = db.query(models.Servico).filter(models.Servico.id == servico_id).first()
+    if not db_servico:
+        raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    
+    db_servico.nome = servico.name
+    db_servico.preco = servico.price
+    db_servico.duracao = servico.durationMinutes
+    db.commit()
+    db.refresh(db_servico)
+    return {"data": {"id": str(db_servico.id), "name": db_servico.nome, "price": db_servico.preco}}
+
+@app.delete("/api/servicos/{servico_id}")
+def deletar_servico(servico_id: int, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
+    db_servico = db.query(models.Servico).filter(models.Servico.id == servico_id).first()
+    if not db_servico:
+        raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    
+    db.delete(db_servico)
+    db.commit()
+    return {"message": "Serviço deletado com sucesso"}
 
 from datetime import datetime # 👈 Certifique-se de que isso está importado lá no topo!
 
@@ -240,6 +311,111 @@ def remarcar_agendamento(agendamento_id: int, novos_dados: AgendamentoUpdate, ba
         "time": agendamento.horario
     }
 
+@app.get("/api/clientes/{cliente_id}/historico")
+def obter_historico_cliente(cliente_id: int, db: Session = Depends(database.get_db)):
+    # 1. Valida se o cliente existe
+    cliente = db.query(models.Usuario).filter(models.Usuario.id == cliente_id).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    
+    # 2. Obtém a data de hoje para filtro
+    agora = datetime.now()
+    data_hoje_str = agora.strftime("%Y-%m-%d")
+    
+    # 3. Busca agendamentos históricos (data anterior) com status concluído ou cancelado
+    agendamentos_historico = db.query(models.Agendamento).filter(
+        models.Agendamento.cliente_id == cliente_id,
+        models.Agendamento.data < data_hoje_str,
+        models.Agendamento.status.in_(["concluído", "Cancelado"])
+    ).order_by(models.Agendamento.data.desc()).all()
+    
+    # 4. Formata a resposta em JSON validado
+    lista_formatada = []
+    for a in agendamentos_historico:
+        lista_formatada.append({
+            "id": str(a.id),
+            "date": a.data,
+            "time": a.horario,
+            "status": a.status,
+            "barberId": str(a.profissional_id),
+            "barberName": a.profissional.nome if a.profissional else "Profissional Removido",
+            "service": {
+                "name": a.servico.nome if a.servico else "Serviço Removido",
+                "price": float(a.servico.preco) if a.servico else 0
+            },
+            "createdAt": a.criacao.isoformat() if a.criacao else None
+        })
+    
+    return {
+        "data": lista_formatada,
+        "total": len(lista_formatada),
+        "clientId": str(cliente_id),
+        "clientName": cliente.nome
+    }
+
+@app.get("/api/relatorios")
+def obter_relatorios(
+    data_inicio: str = None, 
+    data_fim: str = None, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.Usuario = Depends(require_admin)
+):
+    from sqlalchemy import func
+
+    # 1. Monta os filtros dinâmicos de Data
+    filtros_concluido = [models.Agendamento.status == "concluído"]
+    filtros_geral = [models.Agendamento.status.in_(["concluído", "confirmado"])]
+
+    if data_inicio:
+        filtros_concluido.append(models.Agendamento.data >= data_inicio)
+        filtros_geral.append(models.Agendamento.data >= data_inicio)
+    if data_fim:
+        filtros_concluido.append(models.Agendamento.data <= data_fim)
+        filtros_geral.append(models.Agendamento.data <= data_fim)
+
+    # 2. FATURAMENTO (Soma dos serviços concluídos no período)
+    faturamento_mes = db.query(func.sum(models.Servico.preco).label("total")).join(
+        models.Agendamento, models.Servico.id == models.Agendamento.servico_id
+    ).filter(*filtros_concluido).first()
+    
+    total_faturamento = float(faturamento_mes.total) if faturamento_mes and faturamento_mes.total else 0
+
+    # 3. SERVIÇOS MAIS REALIZADOS
+    servicos_populares = db.query(
+        models.Servico.id, models.Servico.nome, func.count(models.Agendamento.id).label("quantidade")
+    ).join(
+        models.Agendamento, models.Servico.id == models.Agendamento.servico_id
+    ).filter(*filtros_concluido).group_by(models.Servico.id, models.Servico.nome).order_by(func.count(models.Agendamento.id).desc()).limit(5).all()
+    
+    top_servicos = [{"id": str(s.id), "name": s.nome, "quantity": s.quantidade} for s in servicos_populares]
+
+    # 4. PROFISSIONAIS MAIS AGENDADOS
+    barbeiros_agendados = db.query(
+        models.Usuario.id, models.Usuario.nome, func.count(models.Agendamento.id).label("total_agendamentos")
+    ).join(
+        models.Agendamento, models.Usuario.id == models.Agendamento.profissional_id
+    ).filter(models.Usuario.tipo == "barber", *filtros_geral).group_by(models.Usuario.id, models.Usuario.nome).order_by(func.count(models.Agendamento.id).desc()).limit(5).all()
+    
+    top_barbeiros = [{"id": str(b.id), "name": b.nome, "appointments": b.total_agendamentos} for b in barbeiros_agendados]
+
+    # 5. ESTATÍSTICAS GERAIS
+    total_agendamentos = db.query(func.count(models.Agendamento.id)).filter(*filtros_geral).scalar() or 0
+    total_confirmados = db.query(func.count(models.Agendamento.id)).filter(
+        models.Agendamento.status == "confirmado", 
+        *( [models.Agendamento.data >= data_inicio] if data_inicio else []),
+        *( [models.Agendamento.data <= data_fim] if data_fim else [])
+    ).scalar() or 0
+    
+    taxa_conclusao = (total_agendamentos / (total_agendamentos + total_confirmados) * 100) if total_agendamentos > 0 else 0
+
+    return {
+        "data": {
+            "revenue": {"total": round(total_faturamento, 2), "currency": "BRL"},
+            "topServices": top_servicos,
+            "topBarbers": top_barbeiros,
+            "appointments": {"confirmed": total_confirmados, "total": total_agendamentos, "completionRate": round(taxa_conclusao, 2)}
+        }
+    }
 # ---------------------------------------------------------
 # ROTAS DE AUTENTICAÇÃO (AGORA COM CRIPTOGRAFIA 🔒)
 # ---------------------------------------------------------
@@ -283,7 +459,45 @@ def login(credenciais: LoginSchema, db: Session = Depends(database.get_db)):
 @app.get("/api/profissionais")
 def listar_profissionais(db: Session = Depends(database.get_db)):
     barbeiros = db.query(models.Usuario).filter(models.Usuario.tipo == 'barber').all()
-    return {"data": [{"id": str(b.id), "name": b.nome} for b in barbeiros]}
+    return {"data": [{"id": str(b.id), "name": b.nome, "email": b.email} for b in barbeiros]}
+
+@app.post("/api/profissionais")
+def criar_profissional(dados: ProfissionalCreate, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
+    novo_profissional = models.Usuario(
+        nome=dados.name,
+        email=dados.email,
+        senha=get_password_hash(dados.email),  # Usa o email como senha padrão
+        tipo='barber'
+    )
+    db.add(novo_profissional)
+    db.commit()
+    db.refresh(novo_profissional)
+    return {"data": {"id": str(novo_profissional.id), "name": novo_profissional.nome, "email": novo_profissional.email}}
+
+@app.put("/api/profissionais/{profissional_id}")
+def atualizar_profissional(profissional_id: int, dados: ProfissionalUpdate, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
+    profissional = db.query(models.Usuario).filter(models.Usuario.id == profissional_id).first()
+    if not profissional:
+        raise HTTPException(status_code=404, detail="Profissional não encontrado")
+    
+    if dados.name:
+        profissional.nome = dados.name
+    if dados.email:
+        profissional.email = dados.email
+    
+    db.commit()
+    db.refresh(profissional)
+    return {"data": {"id": str(profissional.id), "name": profissional.nome, "email": profissional.email}}
+
+@app.delete("/api/profissionais/{profissional_id}")
+def deletar_profissional(profissional_id: int, db: Session = Depends(database.get_db), current_user: models.Usuario = Depends(require_admin)):
+    profissional = db.query(models.Usuario).filter(models.Usuario.id == profissional_id).first()
+    if not profissional:
+        raise HTTPException(status_code=404, detail="Profissional não encontrado")
+    
+    db.delete(profissional)
+    db.commit()
+    return {"message": "Profissional deletado com sucesso"}
 
 @app.get("/api/auth/eu")
 def verificar_sessao(): return {"status": "ok"}
