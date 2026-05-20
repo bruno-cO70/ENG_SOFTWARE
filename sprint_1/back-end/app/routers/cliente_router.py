@@ -4,7 +4,7 @@ from app.core.security import verify_token
 from app.services.agendamento_service import AgendamentoService
 from app.repositories.repository_impl import AgendamentoRepositoryImpl, UsuarioRepositoryImpl, ServicoRepositoryImpl
 from app.services.email_service_impl import EmailServiceImpl
-import database
+from app import database
 
 router = APIRouter(prefix="/api/clientes", tags=["clientes"])
 

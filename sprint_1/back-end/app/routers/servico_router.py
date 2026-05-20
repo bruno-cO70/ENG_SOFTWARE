@@ -4,8 +4,8 @@ from app.core.security import verify_token
 from app.schemas.schemas import ServicoCreate, ServicoUpdate
 from app.services.servico_service import ServicoService
 from app.repositories.repository_impl import ServicoRepositoryImpl
-import database
-import models
+from app import database
+from app import models
 
 router = APIRouter(prefix="/api/servicos", tags=["servicos"])
 

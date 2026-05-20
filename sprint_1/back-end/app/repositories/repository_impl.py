@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-import models
+from app import models
 from app.interfaces.repository_interfaces import UsuarioRepository, AgendamentoRepository, ServicoRepository
 
 

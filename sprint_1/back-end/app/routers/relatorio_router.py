@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.core.security import verify_token
 from app.services.relatorio_service import RelatorioService
-import database
-import models
+from app import database
+from app import models
 
 router = APIRouter(prefix="/api/relatorios", tags=["relatorios"])
 

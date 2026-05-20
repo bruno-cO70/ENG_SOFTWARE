@@ -2,7 +2,7 @@ from typing import Optional, List
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-import models
+from app import models
 
 
 class RelatorioService:

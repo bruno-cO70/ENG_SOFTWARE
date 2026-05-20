@@ -4,7 +4,7 @@ from app.core.security import verify_token
 from app.schemas.schemas import CadastroSchema, LoginSchema
 from app.services.usuario_service import UsuarioService
 from app.repositories.repository_impl import UsuarioRepositoryImpl
-import database
+from app import database
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

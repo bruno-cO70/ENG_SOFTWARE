@@ -6,8 +6,8 @@ from app.services.agendamento_service import AgendamentoService
 from app.services.servico_service import DisponibilidadeService
 from app.repositories.repository_impl import AgendamentoRepositoryImpl, UsuarioRepositoryImpl, ServicoRepositoryImpl
 from app.services.email_service_impl import EmailServiceImpl
-import database
-import models
+from app import database
+from app import models
 
 router = APIRouter(prefix="/api/agendamentos", tags=["agendamentos"])
 

@@ -4,8 +4,8 @@ from app.core.security import verify_token
 from app.schemas.schemas import ProfissionalCreate, ProfissionalUpdate
 from app.services.usuario_service import ProfissionalService
 from app.repositories.repository_impl import UsuarioRepositoryImpl
-import database
-import models
+from app import database
+from app import models
 
 router = APIRouter(prefix="/api/profissionais", tags=["profissionais"])
 
