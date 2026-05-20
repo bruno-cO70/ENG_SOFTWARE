@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.core.security import verify_token
@@ -13,7 +13,7 @@ def get_relatorio_service(db: Session = Depends(database.get_db)) -> RelatorioSe
     return RelatorioService(db)
 
 
-def require_admin(authorization: str = None, db: Session = Depends(database.get_db)) -> models.Usuario:
+def require_admin(authorization: str = Header(None), db: Session = Depends(database.get_db)) -> models.Usuario:
     if not authorization:
         raise HTTPException(status_code=401, detail="Token não fornecido")
 

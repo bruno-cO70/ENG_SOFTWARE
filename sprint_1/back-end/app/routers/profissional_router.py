@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from app.core.security import verify_token
 from app.schemas.schemas import ProfissionalCreate, ProfissionalUpdate
@@ -14,7 +14,7 @@ def get_profissional_service(db: Session = Depends(database.get_db)) -> Profissi
     return ProfissionalService(UsuarioRepositoryImpl(db))
 
 
-def require_admin(authorization: str = None, db: Session = Depends(database.get_db)) -> models.Usuario:
+def require_admin(authorization: str = Header(None), db: Session = Depends(database.get_db)) -> models.Usuario:
     if not authorization:
         raise HTTPException(status_code=401, detail="Token não fornecido")
 

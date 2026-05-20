@@ -11,8 +11,8 @@ class RelatorioService:
 
     def obter_relatorios(self, data_inicio: Optional[str] = None, data_fim: Optional[str] = None) -> dict:
         # Monta os filtros dinâmicos de Data
-        filtros_concluido = [models.Agendamento.status == "concluído"]
-        filtros_geral = [models.Agendamento.status.in_(["concluído", "confirmado"])]
+        filtros_concluido = [models.Agendamento.status.in_(["concluído", "confirmado", "aguardando"])]
+        filtros_geral = [models.Agendamento.status.in_(["concluído", "confirmado", "aguardando"])]
 
         if data_inicio:
             filtros_concluido.append(models.Agendamento.data >= data_inicio)
