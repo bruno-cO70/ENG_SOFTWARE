@@ -66,6 +66,10 @@ class ProfissionalService:
     def __init__(self, usuario_repo: UsuarioRepository):
         self.usuario_repo = usuario_repo
 
+    def get_profissionais(self):
+        # O Service pede para o Repository buscar os barbeiros no banco
+        return self.usuario_repo.get_all_barbers()
+
     def criar_profissional(self, nome: str, email: str, phone: Optional[str] = None) -> dict:
         profissional = self.usuario_repo.create(
             nome=nome,
