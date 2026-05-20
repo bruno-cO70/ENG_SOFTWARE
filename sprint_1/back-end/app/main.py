@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import database
-import models
+from app import database
+from app import models
 from app.routers import auth_router, servico_router, agendamento_router, cliente_router, profissional_router, relatorio_router
 from app.services.email_service_impl import EmailServiceImpl
 
