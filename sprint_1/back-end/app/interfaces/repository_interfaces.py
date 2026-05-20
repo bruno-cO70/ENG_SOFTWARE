@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from models import Usuario, Agendamento, Servico
+from app.models import Usuario, Agendamento, Servico
 
 
 class UsuarioRepository(ABC):
