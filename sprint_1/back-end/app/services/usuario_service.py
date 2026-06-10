@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from app.interfaces.repository_interfaces import UsuarioRepository, AgendamentoRepository, ServicoRepository
 from app.interfaces.email_interface import EmailService
 from app.core.security import verify_password, get_password_hash, create_access_token
@@ -101,4 +102,11 @@ class ProfissionalService:
         }
 
     def deletar_profissional(self, profissional_id: int) -> bool:
-        return self.usuario_repo.delete(profissional_id)
+        try:
+            return self.usuario_repo.delete(profissional_id)
+        except IntegrityError:
+            # Capturamos o erro do banco e avisamos o front-end de forma amigável
+            raise HTTPException(
+                status_code=400, 
+                detail="Não é possível remover este profissional, pois ele possui agendamentos vinculados a ele."
+            )

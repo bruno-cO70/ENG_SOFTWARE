@@ -80,8 +80,12 @@ async function deleteProfessional(id: string) {
   try {
     await profissionalService.delete(id)
     await loadProfessionals()
-  } catch (error) {
-    alert("Erro ao remover profissional.")
+  } catch (error: any) {
+    // O FastAPI envia o texto do erro dentro de 'detail'. 
+    // Se não achar, ele usa o 'message' padrão ou o texto de fallback.
+    const erroDoBackEnd = error?.detail || error?.message || "Erro ao remover profissional."
+    
+    alert(erroDoBackEnd)
   }
 }
 </script>

@@ -275,6 +275,9 @@ async function handleLeadSubmit() {
 /* ==========================================
  * COMPONENTES DE TEXTO E BOTÕES
  * ========================================== */
+ section {
+  scroll-margin-top: 100px;
+}
 .eyebrow { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: #d4af37; margin-bottom: 16px; display: block; }
 h1.serif-title { font-size: clamp(32px, 3.5vw, 52px); margin-bottom: 24px; }
 h2.serif-title { font-size: clamp(28px, 3.2vw, 40px); margin-bottom: 24px; }
